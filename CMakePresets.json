@@ -1,0 +1,29 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 19
+    },
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Default (no tests)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ASTRO_BUILD_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "with-tests",
+            "displayName": "With Tests",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ASTRO_BUILD_TESTS": "ON"
+            }
+        }
+    ]
+}
