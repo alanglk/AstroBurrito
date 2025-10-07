@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Useful for IDEs and tooling
 
 # Find dependencies
-find_package(X11 REQUIRED) # For window creation in Linux
+
 
 # Enable tests if setted
 option(ASTRO_BUILD_TESTS "Build Astro tests" OFF)
