@@ -5,4 +5,4 @@ add_executable(game
 
 target_compile_features(game PUBLIC cxx_std_20)
 
-target_link_libraries(game PRIVATE astro_core)
+target_link_libraries(game PRIVATE astro_core astro_graphics)

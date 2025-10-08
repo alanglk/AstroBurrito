@@ -22,6 +22,7 @@ public:
     virtual void processEvents(LayerEvent& layerEvent)  = 0;
 
     virtual void render()  = 0;
+    virtual void close()  = 0;
 
 };
 
