@@ -2,14 +2,17 @@
 #include "astro/core/platform/X11Layer.hpp"
 #include "astro/core/platform/LayerConfig.hpp"
 
-#include <X11/Xlib.h>
+#include <clocale>
 #include <stdexcept>
 #include <string>
 #include <sys/types.h>
 #include <cstddef>
 
 #include <iostream>
+
 #include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/keysym.h>
 
 namespace astro {
 namespace core {
@@ -36,6 +39,22 @@ namespace core {
         XSelectInput(display, window, event_mask);
         XMapWindow(display, window); // Show the window
         
+        // Register DeleteWindow message name from the window manager
+        wmDeleteWindow = XInternAtom( display, "WM_DELETE_WINDOW", False ); 
+        XSetWMProtocols(display, window, &wmDeleteWindow, 1);
+        
+        // Create Input Method context (for parsing platform specific key inputs to strings)
+        inputMethod = XOpenIM(display, NULL, NULL, NULL);
+        if (inputMethod == NULL) {
+            throw std::runtime_error("[X11Layer] ERROR: Could not ccreate Input Method Context");
+        }
+        inputContext = XCreateIC(inputMethod, 
+            XNInputStyle, XIMPreeditNothing | XIMStatusNothing, 
+            XNClientWindow, window, 
+            XNFocusWindow, window,  
+            NULL);
+
+        // Create screen and visual contexts for displaying images
         Screen *screen = XDefaultScreenOfDisplay(display);
         Visual *visual = XDefaultVisualOfScreen(screen);
         int depth = XDefaultDepthOfScreen(screen); // This should match layerConfig.colorDepth
@@ -76,21 +95,107 @@ namespace core {
         };
         return layerInitData;
     }
+
+    long X11Layer::layerEventToX11(LayerEventType requestedEvents) {
+        long x11_mask = 0;
+        uint32_t events = static_cast<uint32_t>(requestedEvents);
+
+        // 1. Check for KeyPress:
+        if (events & static_cast<uint32_t>(LayerEventType::EvtKeyPress)) {
+            x11_mask |= KeyPressMask;
+        }
+        
+        // 2. Check for KeyRelease:
+        if (events & static_cast<uint32_t>(LayerEventType::EvtKeyRelease)) {
+            x11_mask |= KeyReleaseMask;
+        }
+
+        // 3. Check for MouseButtonPress:
+        if (events & static_cast<uint32_t>(LayerEventType::EvtMouseButtonPress)) {
+            x11_mask |= ButtonPressMask;
+        }
+
+        // 4. Check for MouseButtonRelease:
+        if (events & static_cast<uint32_t>(LayerEventType::EvtMouseButtonRelease)) {
+            x11_mask |= ButtonReleaseMask;
+        }
+
+        return x11_mask;
+    }
     
     void X11Layer::processEvents(LayerEvent& layerEvent){
-        
+
         // Iterate throug all pending events
+        layerEvent.type = LayerEventType::EvtNone; // Clear prev event
         while(XPending(display) > 0){
-            XEvent event = {0};
-            XNextEvent(display, &event);
+            XEvent xevent = {0};
+            XNextEvent(display, &xevent);
             
-            if (event.type == KeyPress){
-                layerEvent.shouldClose = true;
+            switch (xevent.type) {
+                // --------------- WINDOW EVENTS -----------------
+                case ClientMessage:{
+                    if (xevent.xclient.data.l[0] == wmDeleteWindow) {
+                        layerEvent.type = LayerEventType::EvtWindowClose;
+                    }
+                    break; 
+                }
+                case ConfigureNotify: {
+                    // Sent when the window is resized or moved
+                    layerEvent.type = LayerEventType::EvtWindowResize;
+                    layerEvent.data.window.width    = xevent.xconfigure.width;
+                    layerEvent.data.window.height   = xevent.xconfigure.height;
+                    break;
+                }
+
+                // --------------- KEYBOARD EVENTS ---------------
+                case KeyPress: {
+                    layerEvent.type = LayerEventType::EvtKeyPress;
+                    KeyboardEventData& key_data = layerEvent.data.key;
+                    fillKeyEventWithData(&xevent.xkey, layerEvent.data.key);
+                    break;
+                }
+                case KeyRelease: {
+                    layerEvent.type = LayerEventType::EvtKeyRelease;
+                    KeyboardEventData& key_data = layerEvent.data.key;
+                    fillKeyEventWithData(&xevent.xkey, layerEvent.data.key);
+                }
+                break;
+
+                // --------------- MOUSE EVENTS ------------------
+                
+                // --------------- OTHER EVENTS ------------------
+                default:{
+                    std::cout << "[X11Layer] Unknown event\n";
+                    break;
+                }
             }
         }
             
     }
     
+    
+    void X11Layer::fillKeyEventWithData(XKeyEvent* xkey_event, KeyboardEventData& key_data){
+        KeySym keysym = NoSymbol;
+        Status status;
+        int count = Xutf8LookupString(
+            inputContext,                       // The Input Context (IC)
+            xkey_event,                         // The KeyPress/KeyRelease event structure
+            key_data.utf8_buffer,               // Output buffer for character(s)
+            sizeof(key_data.utf8_buffer) - 1,   // Size of the output buffer
+            &keysym,                            // Output for the KeySym
+            &status                             // Output for the result status
+        );
+
+        if (count > 0 && status != XLookupNone) {
+            // utf8_buffer now contains the typed character(s) as UTF-8.
+            key_data.utf8_buffer[count] = '\0';
+            key_data.buf_count = count;
+        } else{
+            key_data.buf_count = 0;
+        }
+        key_data.keycode = xkey_event->keycode;
+    }
+
     void X11Layer::render() {
         std::cout << "WARNING: render() Not implemented yet\n";
     }

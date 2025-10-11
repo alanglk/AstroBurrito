@@ -29,34 +29,12 @@ private:
     Window window;      // Application window
     GC gc;              // Grafical context (software rendering)
     XImage* ximage;     // XImage pointing to the rendering_buffer
+    Atom wmDeleteWindow;// Atom representing the WindowManager DeleteWindow message
+    XIM inputMethod; XIC inputContext; // Parsing key inputs into strings
 
+    void fillKeyEventWithData(XKeyEvent* xkey_event, KeyboardEventData& key_data);
+    long layerEventToX11(LayerEventType requestedEvents);
 
-    long layerEventToX11(LayerEventRequest requestedEvents) {
-        long x11_mask = 0;
-        uint32_t events = static_cast<uint32_t>(requestedEvents);
-
-        // 1. Check for KeyPress:
-        if (events & static_cast<uint32_t>(LayerEventRequest::EvtKeyPress)) {
-            x11_mask |= KeyPress;
-        }
-        
-        // 2. Check for KeyRelease:
-        if (events & static_cast<uint32_t>(LayerEventRequest::EvtKeyRelease)) {
-            x11_mask |= KeyReleaseMask;
-        }
-
-        // 3. Check for MouseButtonPress:
-        if (events & static_cast<uint32_t>(LayerEventRequest::EvtMouseButtonPress)) {
-            x11_mask |= ButtonPressMask;
-        }
-
-        // 4. Check for MouseButtonRelease:
-        if (events & static_cast<uint32_t>(LayerEventRequest::EvtMouseButtonRelease)) {
-            x11_mask |= ButtonReleaseMask;
-        }
-
-        return x11_mask;
-    }
 };
 
 }

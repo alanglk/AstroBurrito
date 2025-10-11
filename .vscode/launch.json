@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Game (GDB)",
+            "name": "Debug Game (GDB)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${command:cmake.launchTargetPath}",
+            "program": "${workspaceFolder}/build/game/game",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

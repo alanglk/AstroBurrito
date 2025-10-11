@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -6,17 +7,20 @@ namespace astro {
 namespace core {
     
 
-enum class LayerEventRequest : uint32_t {
-    None                        = 0,            // No layer events
-    EvtKeyPress                 = (1 << 0),     // Listen for keypress events
-    EvtKeyRelease               = (1 << 1),     // Listen for keyrelease events
-    EvtMouseButtonPress         = (1 << 2),     // Listen for mouse button press events
-    EvtMouseButtonRelease       = (1 << 3),     // Listen for mouse button release events
-    All = EvtKeyPress | EvtKeyRelease | EvtMouseButtonPress | EvtMouseButtonRelease
+enum class LayerEventType : uint32_t {
+    EvtNone                     = 0,            // No layer events
+    EvtWindowClose              = (1 << 0),     // window close event
+    EvtWindowResize             = (1 << 1),     // window resize event
+    EvtKeyPress                 = (1 << 2),     // keypress events
+    EvtKeyRelease               = (1 << 3),     // keyrelease events
+    EvtMouseButtonPress         = (1 << 4),     // mouse button press events
+    EvtMouseButtonRelease       = (1 << 5),     // mouse button release events
+
+    EvtRequestAll = EvtKeyPress | EvtKeyRelease | EvtMouseButtonPress | EvtMouseButtonRelease
 };
-// Bit wise operator for LayerEventRequest
-inline LayerEventRequest operator&(LayerEventRequest a, LayerEventRequest b) {
-    return static_cast<LayerEventRequest>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+// Bit wise operator for LayerEventType
+inline LayerEventType operator&(LayerEventType a, LayerEventType b) {
+    return static_cast<LayerEventType>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
 }
 
 /**
@@ -28,7 +32,7 @@ struct LayerConfig {
     int displayWidth = 800;
     int displayHeight = 600;
     int colorDepth = 8; // number of bits per color value (8-bit color, 16-bit...)
-    LayerEventRequest requestedEvents = LayerEventRequest::None; // Request of desired Layer events
+    LayerEventType requestedEvents = LayerEventType::EvtNone; // Request of desired Layer events
 };
 
 /**
@@ -42,8 +46,44 @@ struct LayerInitData {
 };
 
 
+enum class MouseButton : uint8_t {
+    MouseNone = 0,
+    MouseLeft,
+    MouseRight,
+    MouseMiddle,
+};
+
+// --- Event Data Structures ---
+struct KeyboardEventData {
+    char utf8_buffer[32];   // ('A', 'Space', 'F1')
+    int buf_count;
+    unsigned int keycode;   // keycode
+};
+struct MouseEventData {
+    int32_t x; // Mouse pointer position
+    int32_t y;
+    // Which button was pressed/released, or None for movement events
+    MouseButton button; 
+};
+struct WindowEventData {
+    // For resize events, this holds the new width/height
+    int32_t width;
+    int32_t height;
+};
+
 struct LayerEvent {
-    bool shouldClose = false; // Layer is shutting down
+    // How to interpret the data structure
+    LayerEventType type = LayerEventType::EvtNone; 
+
+    union {
+        // Empty struct for events with no extra data (like EvtNone or EvtWindowClose)
+        struct {} none; // No extra data
+        
+        KeyboardEventData key;
+        MouseEventData mouse;
+        WindowEventData window;
+        
+    } data;
 };
 
 }
