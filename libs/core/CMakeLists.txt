@@ -32,6 +32,11 @@ if(UNIX)
         PRIVATE
             ${X11_LIBRARIES}
     )
+
+    # Add tests for X11Layer (only if ASTRO_BUILD_TESTS=ON)
+    astro_add_tests(astro_core SOURCES
+        tests/X11Layer_tests.cpp
+    )
 endif()
 
 # Windows 

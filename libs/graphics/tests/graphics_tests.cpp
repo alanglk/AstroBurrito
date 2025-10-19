@@ -3,16 +3,20 @@
 #include "astro_test.hpp"
 
 
+#define WIDTH 800
+#define HEIGHT 600
 using namespace astro::graphics;
 using namespace astro::math;
 
 TEST(clearCanvas){
+    Matrix<int, WIDTH, HEIGHT> cero_matrix(0);
+    Matrix<int, WIDTH, HEIGHT> wht_matrix(0xFFFFFFFF);
+
     // Clear to black
-    AstroCanvas canvas;
+    Matrix<int, WIDTH, HEIGHT> canv_matrix(0xFF000000);
+    AstroCanvas canvas = {canv_matrix.data.data(), canv_matrix.rows, canv_matrix.cols};
     Color color(0);
     clearCanvas(canvas, color);
-    Matrix<int, WIDTH, HEIGHT> cero_matrix(0);
-    Matrix<int, WIDTH, HEIGHT> canv_matrix(canvas.data, canvas.width, canvas.height);
     ASSERT_EQ(canv_matrix, cero_matrix);
     
     
@@ -22,7 +26,6 @@ TEST(clearCanvas){
     color.data[2] = 0xFF; // B
     color.data[3] = 0xFF; // A
     clearCanvas(canvas, color);
-    Matrix<int, WIDTH, HEIGHT> wht_matrix(0xFFFFFFFF);
     ASSERT_EQ(canv_matrix, wht_matrix);
 
     return true;

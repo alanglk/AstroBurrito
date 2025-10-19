@@ -10,18 +10,22 @@
 
 using namespace astro::core;
 
+#define WIDTH 800
+#define HEIGHT 600
+
 int main(){
     std::cout << "AstroBurrito project\n";
 
     const LayerConfig layerConfig = {
         "AstroBurrito",
-        800,
-        600,
+        WIDTH,
+        HEIGHT,
         24,
         LayerEventType::EvtRequestAll
     };
     const auto console = std::make_unique<X11Layer>();
     const auto initConf = console->initialize(layerConfig);
+    
     LayerEvent event;
 
     bool shouldClose = false;

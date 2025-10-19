@@ -5,13 +5,12 @@
 namespace astro {
 namespace graphics {
 
-#define WIDTH 600
-#define HEIGHT 800
+typedef math::Vector<uint8_t, 4> Color;
 
 struct AstroCanvas {
-    int data[WIDTH][HEIGHT];
-    int width = WIDTH;
-    int height = HEIGHT;
+    int* data;
+    int width;
+    int height;
 };
 
 /**
@@ -20,7 +19,7 @@ struct AstroCanvas {
  * @param canvas 
  * @param color 
  */
-void clearCanvas(AstroCanvas& canvas, math::Color color);
+void clearCanvas(AstroCanvas& canvas, Color color);
 
 /**
  * @brief Checks wheter the point is in the canvas or not
@@ -40,7 +39,7 @@ bool isInCanvasBounds(AstroCanvas& canvas, math::Vec2i point);
  * @param color 
  * @param size by default is one pixel
  */
-void drawPoint(AstroCanvas& canvas, math::Vec2i point, math::Color color, uint size = 1);
+void drawPoint(AstroCanvas& canvas, math::Vec2i point, Color color, uint size = 1);
 
 }
 }

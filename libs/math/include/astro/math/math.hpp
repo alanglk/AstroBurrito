@@ -1,28 +1,27 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <initializer_list>
-#include <optional>
 #include <ostream>
 #include <stdexcept>
 
 namespace astro {
 namespace math {
     
-// --- Vector ------
+// ========================================================
+// --- VECTOR ---------------------------------------------
+// ========================================================
 template<typename T, int N>
 struct Vector {
     T data[N];
     Vector() = default; // No initialization
-    explicit Vector(const T val){     // Scalar initialization
-        for(int i = 0; i < N; i++){
-            data[i] = val;
-        }
+    explicit Vector(const T& val){     // Scalar initialization
+        std::fill(data, data+N, val);
     };
-    Vector(T& vector, int n){
-        if(n != N) 
-            throw std::runtime_error("Invalid dimensions for Vector constructor");
-        for(int i = 0; i < N; i++) data[i] = vector[i];
+    Vector(const Vector<T, N>& vec){ // Copy-Constructor
+        for (int i = 0; i < N; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(N != list.size()) 
@@ -32,8 +31,16 @@ struct Vector {
             data[i] = *it;
         }
     }
+
+    // Access operators
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
+    
+    // Assignment operators
+    Vector<T, N>& operator=(const T& val){
+        std::fill(data, data+N, val);
+        return *this;
+    }
 };
 
 template<typename T> struct Vector<T, 2> {
@@ -42,11 +49,9 @@ template<typename T> struct Vector<T, 2> {
         struct { T x, y; };
     };
     Vector() = default; // No initialization
-    explicit Vector(const T val) : data(val, val) {} // Scalar fill
-    Vector(T& vector, int n){ // Raw data initialization
-        if(n != 2) 
-            throw std::runtime_error("Invalid dimensions for Vector constructor");
-        for(int i = 0; i < 2; i++) data[i] = vector[i];
+    explicit Vector(const T& val) : data(val, val) {} // Scalar fill
+    Vector(const Vector<T, 2>& vec){ // Copy-Constructor
+        for (int i = 0; i < 2; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != 2) 
@@ -55,8 +60,15 @@ template<typename T> struct Vector<T, 2> {
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
     }
     
+    // Access operators
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
+
+    // Assignment operators
+    Vector<T, 2>& operator=(const T& val){
+        std::fill(data, data+2, val);
+        return *this;
+    }
 };
 
 template<typename T> struct Vector<T, 3> {
@@ -65,11 +77,9 @@ template<typename T> struct Vector<T, 3> {
         struct{ T x, y, z; };
     };
     Vector() = default; // No initialization
-    explicit Vector(const T val) : data(val, val, val) {} // Scalar fill
-    Vector(T& vector, int n){ // Raw data initialization
-        if(n != 3) 
-            throw std::runtime_error("Invalid dimensions for Vector constructor");
-        for(int i = 0; i < 3; i++) data[i] = vector[i];
+    explicit Vector(const T& val) : data(val, val, val) {} // Scalar fill
+    Vector(const Vector<T, 3>& vec){ // Copy-Constructor
+        for (int i = 0; i < 3; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != 3) 
@@ -78,8 +88,15 @@ template<typename T> struct Vector<T, 3> {
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
     }
     
+    // Access operators
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
+
+    // Assignment operators
+    Vector<T, 3>& operator=(const T& val){
+        std::fill(data, data+3, val);
+        return *this;
+    }
 };
 
 template<typename T> struct Vector<T, 4> {
@@ -92,11 +109,9 @@ template<typename T> struct Vector<T, 4> {
         Vector<T, 3> rgb;
     };
     Vector() = default; // No initialization
-    explicit Vector(const T val) : data(val, val, val, val) {} // scalar fill
-    Vector(T& vector, int n){ // Raw data initialization
-        if(n != 4) 
-            throw std::runtime_error("Invalid dimensions for Vector constructor");
-        for(int i = 0; i < 4; i++) data[i] = vector[i];
+    explicit Vector(const T& val) : data(val, val, val, val) {} // scalar fill
+    Vector(const Vector<T, 4>& vec){ // Copy-Constructor
+        for (int i = 0; i < 4; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != 4) 
@@ -105,8 +120,15 @@ template<typename T> struct Vector<T, 4> {
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
     }
     
+    // Access operators
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
+
+    // Assignment operators
+    Vector<T, 4>& operator=(const T& val){
+        std::fill(data, data+4, val);
+        return *this;
+    }
 };
 
 // Common type definitions
@@ -116,7 +138,6 @@ typedef Vector<float, 4> Vec4f;
 
 typedef Vector<int, 2> Vec2i;
 
-typedef Vector<uint8_t, 4> Color;
 typedef Vector<uint, 4> Color32;
 
 // Vector Operators
@@ -140,6 +161,10 @@ bool operator==(const Vector<T, N>& a, const Vector<T, N>& b) {
         i++;
     }
     return equal; 
+}
+template<typename T, int N>
+bool operator!=(const Vector<T, N>& a, const Vector<T, N>& b) {
+    return !(a == b); 
 }
 
 /**
@@ -200,45 +225,141 @@ T dot(const Vector<T, N>& a, const Vector<T, N>& b) {
     return res; 
 }
 
+/**
+ * @brief Get the dimension of a vector
+ * @return int 
+ */
+template<typename T, int N>
+int len(Vector<T, N>){ return N; }
 
 
-// --- Matrix ------
-
+// ========================================================
+// --- MATRIX ---------------------------------------------
+// ========================================================
 template<typename T, int N, int M> // N -> Rows | M -> Cols
 struct Matrix {
-    T data[N][M];
-    Matrix() = default;
-    explicit Matrix(const T& val){
-        for(int j = 0; j < M; j++)
-            for(int i = 0; i < N; i++)
-                data[i][j] = val;
+    std::array<T, N*M> data; 
+    using value_type = T;
+    static constexpr int rows = N;
+    static constexpr int cols = M;
+
+    // Helper function to calculate the 1D index from 2D coordinates (row-major order)
+    constexpr int index(int r, int c) const {
+        if (r < 0 || r >= N || c < 0 || c >= M) {
+            throw std::out_of_range("Matrix index out of bounds.");
+        }
+        return r * M + c;
     }
-    Matrix(const T (&matrix)[N][M], int n, int m){ // Raw data initialization
-        if (n != N || m != M) 
-            throw std::runtime_error("Invalid dimensions for matrix constructor");
-        for(int j = 0; j < M; j++)
-            for(int i = 0; i < N; i++)
-                data[i][j] = matrix[i][j];
+
+    Matrix() = delete;
+    // Uniform Initialization Constructor
+    explicit Matrix(const T& val) {
+            std::fill(data.begin(), data.end(), val);
+    }
+    Matrix(const std::initializer_list<T> &list){ // List initialization
+        if(N*M != list.size()) 
+            throw std::runtime_error("Mismatch initializer list and vector lengths");
+        int i = 0;
+        for(auto it = list.begin(); it != list.end(); ++it, ++i){
+            data[i] = *it;
+        }
+    }
+    // Copy from a C-style 2D array
+    Matrix(const T (&matrix)[N][M]) {
+        for(int r = 0; r < N; ++r) {
+            for(int c = 0; c < M; ++c) {
+                data[index(r, c)] = matrix[r][c];
+            }
+        }
+    }
+    
+    // Access operator: Matrix[i][j]
+    T& operator()(int r, int c) {
+        return data[index(r, c)];
+    }
+    const T& operator()(int r, int c) const {
+        return data[index(r, c)];
     }
 
 };
 
 template<typename T, int N, int M>
-std::ostream& operator<<(std::ostream& os, const Matrix<T, N, M>& A) {
-    os << N << 'x' << M << "_matrix";
+struct Matrix_View {
+    T* data;  // Non-owning Pointer
+    using value_type = T;
+    static constexpr int rows = N;
+    static constexpr int cols = M;
+
+    // Helper function to calculate the 1D index from 2D coordinates (row-major order)
+    constexpr int index(int r, int c) const {
+        if (r < 0 || r >= N || c < 0 || c >= M) {
+            throw std::out_of_range("Matrix index out of bounds.");
+        }
+        return r * M + c;
+    }
+
+    // Takes a raw pointer to external data.
+    explicit Matrix_View(T* external_data) : data(external_data) {
+        if (data == nullptr) {
+            throw std::invalid_argument("Matrix view requires non-null pointer.");
+        }
+    }
+    
+    // Deleted default constructor (must initialize with data)
+    Matrix_View() = delete; 
+    // **Integration Point:** Constructor to create a view from an owning matrix.
+    Matrix_View(Matrix<T, N, M>& other) : data(other.data.data()) {}
+
+    // Access operators
+    T& operator()(int r, int c) {
+        return data[index(r, c)];
+    }
+    const T& operator()(int r, int c) const {
+        return data[index(r, c)];
+    }
+    
+};
+
+// Matrix concept
+template<typename M>
+concept MatrixLike = requires(const M& m, int r, int c) {
+    // It must have these member types (or use std::remove_cvref_t<decltype(m(r,c))>)
+    typename M::value_type; 
+    
+    // It must have these static members for size
+    { M::rows } -> std::convertible_to<int>;
+    { M::cols } -> std::convertible_to<int>;
+
+    // It must have a const-qualified access operator
+    { m(r, c) } -> std::convertible_to<const typename M::value_type&>;
+};
+
+// Matrix operators
+template <MatrixLike Mat>
+std::ostream& operator<<(std::ostream& os, const Mat& A) {
+    os << Mat::rows << "x" << Mat::cols << " Matrix:\n";
+    for (int r = 0; r < Mat::rows; ++r) {
+        for (int c = 0; c < Mat::cols; ++c)
+            os << A(r, c) << " ";
+        os << "\n";
+    }
     return os;
 }
-
-template <typename T, int N, int M>
-bool operator==(Matrix<T, N, M>& A, Matrix<T, N, M>& B){
-    bool equal = true;
-    int i, j = 0;
-    while (equal && i < N && j < M){
-        equal = A.data[i][j] == B.data[i][j];
-        i++; j++;
-    }
-    return equal;
+template <MatrixLike MatA, MatrixLike MatB>
+requires (MatA::rows == MatB::rows && MatA::cols == MatB::cols)
+bool operator==(const MatA& A, const MatB& B) {
+    for (int r = 0; r < MatA::rows; ++r)
+        for (int c = 0; c < MatA::cols; ++c)
+            if (A(r, c) != B(r, c))
+                return false;
+    return true;
 }
+template <MatrixLike MatA, MatrixLike MatB>
+requires (MatA::rows == MatB::rows && MatA::cols == MatB::cols)
+bool operator!=(const MatA& A, const MatB& B) {
+    return !(A == B);
+}
+
 
 }
 }

@@ -63,7 +63,7 @@ namespace core {
         if (depth != layerConfig.colorDepth) {
             throw std::runtime_error("ERROR: " + 
                 std::to_string(layerConfig.colorDepth) + 
-                "-bit colorDepth request not supported by X11. I was setted to " + 
+                "-bit colorDepth request not supported by X11. It was setted to " + 
                 std::to_string(depth) + "-bit");
         }
 
