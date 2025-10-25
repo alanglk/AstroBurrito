@@ -251,6 +251,6 @@ TEST(MatrixEquality){
 
 int main(){
     bool all_success = run_all_tests();
-    return 0;
+    return !all_success;
 }
 

@@ -35,25 +35,15 @@ struct LayerConfig {
     LayerEventType requestedEvents = LayerEventType::EvtNone; // Request of desired Layer events
 };
 
-/**
- * @brief Initialization data provided by the Engine to the game.
- * It is like the response to the LayerConfig request.
- */
-struct LayerInitData {
-    uint8_t* renderBufferPtr = nullptr;
-    ulong bufferSize;
-    int bufferBitsPerPixel;
-};
 
 
+// --- Event Data Structures ---
 enum class MouseButton : uint8_t {
     MouseNone = 0,
     MouseLeft,
     MouseRight,
     MouseMiddle,
 };
-
-// --- Event Data Structures ---
 struct KeyboardEventData {
     char utf8_buffer[32];   // ('A', 'Space', 'F1')
     int buf_count;

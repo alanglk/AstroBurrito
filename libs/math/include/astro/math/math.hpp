@@ -75,6 +75,7 @@ template<typename T> struct Vector<T, 3> {
     union {
         T data[3]; 
         struct{ T x, y, z; };
+        struct { T r, g, b; };
     };
     Vector() = default; // No initialization
     explicit Vector(const T& val) : data(val, val, val) {} // Scalar fill
@@ -337,7 +338,8 @@ concept MatrixLike = requires(const M& m, int r, int c) {
 // Matrix operators
 template <MatrixLike Mat>
 std::ostream& operator<<(std::ostream& os, const Mat& A) {
-    os << Mat::rows << "x" << Mat::cols << " Matrix:\n";
+    os << "Matrix_" << Mat::rows << "x" << Mat::cols << ":\n";
+    if (Mat::rows > 4 || Mat::cols > 4) return os;
     for (int r = 0; r < Mat::rows; ++r) {
         for (int c = 0; c < Mat::cols; ++c)
             os << A(r, c) << " ";

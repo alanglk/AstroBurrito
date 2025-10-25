@@ -1,16 +1,25 @@
 #pragma once
 
 #include "astro/math/math.hpp"
+#include <cstdint>
+#include <sys/types.h>
+#include <vector>
 
 namespace astro {
 namespace graphics {
 
-typedef math::Vector<uint8_t, 4> Color;
+using namespace astro::math;
+typedef Vector<uint8_t, 4> Color;
 
 struct AstroCanvas {
-    int* data;
     int width;
     int height;
+    std::vector<Color> data;
+    
+    AstroCanvas(int width, int height): width(width), height(height){
+        data.resize(width*height);
+    }
+    
 };
 
 /**
@@ -40,6 +49,12 @@ bool isInCanvasBounds(AstroCanvas& canvas, math::Vec2i point);
  * @param size by default is one pixel
  */
 void drawPoint(AstroCanvas& canvas, math::Vec2i point, Color color, uint size = 1);
+
+
+
+void putPixel(AstroCanvas& canvas, int x, int y, Color color);
+void drawSimplePoint(AstroCanvas& canvas, Vec2i pos, Color color);
+
 
 }
 }

@@ -17,17 +17,14 @@ TEST(renderingBufferDims){
         LayerEventType::EvtNone
     };
     const auto console = std::make_unique<X11Layer>();
-    const auto initConf = console->initialize(layerConfig);
+    console->initialize(layerConfig);
     
     // Check rendering buffer dimensions
-    int actual_size = initConf.bufferSize;
-    int expected_size = WIDTH * HEIGHT * COLOR_DEPTH;
-    ASSERT_EQ(actual_size, expected_size)
 
-    return true;
+    return false;
 }
 
 int main(){
     bool allSuccess = run_all_tests();
-    return 0;
+    return !allSuccess;
 }

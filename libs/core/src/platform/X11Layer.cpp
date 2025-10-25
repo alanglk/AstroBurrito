@@ -1,6 +1,7 @@
 
 #include "astro/core/platform/X11Layer.hpp"
 #include "astro/core/platform/LayerConfig.hpp"
+#include "astro/graphics/graphics.hpp"
 
 #include <clocale>
 #include <stdexcept>
@@ -12,15 +13,13 @@
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/keysym.h>
 
 namespace astro {
 namespace core {
     
-    LayerInitData X11Layer::initialize(const LayerConfig& layerConfig){
-        const size_t buf_size = layerConfig.displayWidth * layerConfig.displayHeight * layerConfig.colorDepth;
-        rendering_buffer.resize(buf_size);
-        
+    void X11Layer::initialize(const LayerConfig& layerConfig){
         display = XOpenDisplay(NULL); // Create connection with XServer
         window = XCreateSimpleWindow(
             display,
@@ -33,6 +32,9 @@ namespace core {
             0x00000000						// background color
         );
         XStoreName(display, window, layerConfig.windowName.data());
+        XGetWindowAttributes(display, window, &windowAttr);
+        windowWidth = windowAttr.width;
+        windowHeight = windowAttr.height;
         
         // Listen for requested events
         long event_mask = layerEventToX11(layerConfig.requestedEvents);
@@ -57,7 +59,7 @@ namespace core {
         // Create screen and visual contexts for displaying images
         Screen *screen = XDefaultScreenOfDisplay(display);
         Visual *visual = XDefaultVisualOfScreen(screen);
-        int depth = XDefaultDepthOfScreen(screen); // This should match layerConfig.colorDepth
+        int depth = XDefaultDepthOfScreen(screen); 
 
         // Ensure colorDepth is reasonable for X11 (e.g., 24 or 32 for common true color)
         if (depth != layerConfig.colorDepth) {
@@ -67,33 +69,38 @@ namespace core {
                 std::to_string(depth) + "-bit");
         }
 
-        // Determine bytes per pixel based on color depth
-        int bits_per_pixel = layerConfig.colorDepth; // typically 24 or 32
-        int bytes_per_pixel = bits_per_pixel / 8;
-        
+        // Create the GraphicalContext for drawing operations
+        gc = XCreateGC(display, window, 0, NULL);
+        if (gc == 0) {
+            throw std::runtime_error("[X11Layer] ERROR: Could not create Graphics Context (GC)");
+        }
+
         // Line padding for the XImage. Often 32 or 8. 
         int bitmap_pad = XBitmapPad(display);
+        XImage* sample_image = XCreateImage( display, visual, depth, ZPixmap, 0, nullptr, windowWidth, windowHeight, bitmap_pad, 0);
+        bitmap_pad = sample_image->bitmap_pad;
+        int bytes_per_line = sample_image->bytes_per_line;
+        XDestroyImage(sample_image);
 
         // Create the XImage structure
+        const size_t buf_size = windowHeight * bytes_per_line;
+        rendering_buffer.resize(buf_size);
         ximage = XCreateImage(
             display,
             visual,
             depth,                // depth
             ZPixmap,              // format (ZPixmap is the common format for true-color data)
-            0,                    // offset (usually 0)
+            0,                    // offset
             (char*)rendering_buffer.data(), // data (Cast required by Xlib, though data() returns a T*)
-            layerConfig.displayWidth,
-            layerConfig.displayHeight,
+            windowWidth,
+            windowHeight,
             bitmap_pad,           // bitmap_pad (alignment of scanlines, e.g., 8, 16, 32)
-            layerConfig.displayWidth * bytes_per_pixel // bytes_per_line
+            bytes_per_line // bytes_per_line
         );
-
-        LayerInitData layerInitData = {
-            rendering_buffer.data(),
-            rendering_buffer.size(),
-            layerConfig.colorDepth
-        };
-        return layerInitData;
+        if (ximage == NULL) {
+            throw std::runtime_error("[X11Layer] ERROR: Failed to create XImage structure.");
+        }
+        
     }
 
     long X11Layer::layerEventToX11(LayerEventType requestedEvents) {
@@ -146,6 +153,8 @@ namespace core {
                     layerEvent.data.window.height   = xevent.xconfigure.height;
                     break;
                 }
+                
+                // TODO: update windowAttr on window resize
 
                 // --------------- KEYBOARD EVENTS ---------------
                 case KeyPress: {
@@ -196,8 +205,43 @@ namespace core {
         key_data.keycode = xkey_event->keycode;
     }
 
-    void X11Layer::render() {
-        std::cout << "WARNING: render() Not implemented yet\n";
+    void X11Layer::render(graphics::AstroCanvas& canvas) {
+
+        // Fill the internal XImage with Canvas data
+        int bytes_per_pixel = ximage->bits_per_pixel / 8;
+        int pixel_index = 0; 
+        for (int y = 0; y < windowHeight; ++y) {
+            int line_start_offset = y * ximage->bytes_per_line;
+
+            for (int x = 0; x < windowWidth; ++x) {
+                if (pixel_index >= canvas.data.size()) {
+                    break; 
+                }
+
+                int pixel_offset = line_start_offset + (x * bytes_per_pixel);
+                const auto& pixel = canvas.data[pixel_index];
+
+                // Fill with pixel data
+                rendering_buffer[pixel_offset]     = pixel.b; // Blue
+                rendering_buffer[pixel_offset + 1] = pixel.g; // Green
+                rendering_buffer[pixel_offset + 2] = pixel.r; // Red
+
+                // Alpha
+                if (bytes_per_pixel == 4) {
+                    rendering_buffer[pixel_offset + 4] = pixel.a;
+                }
+                
+                pixel_index++;
+            }
+
+            if (pixel_index >= canvas.data.size()) {
+                break;
+            }
+        }
+        
+        // Actual rendering
+        XPutImage(display, window, gc, ximage, 0, 0, 0, 0, windowWidth, windowHeight);
+        XFlush(display);
     }
     
     void X11Layer::close(){
@@ -206,7 +250,9 @@ namespace core {
 
         // Destroy the XImage structure (frees the XImage struct, but NOT the underlying buffer)
         if (ximage != nullptr) {
-            delete ximage; ximage = nullptr;
+            // delete ximage; ximage = nullptr;
+            // XDestroyImage(ximage); 
+            ximage = nullptr;
         }
 
         // Free the Graphical Context (GC)
@@ -220,6 +266,7 @@ namespace core {
         }
 
         // Close the connection to the X Server and flush all pending requests
+        XDestroyImage(ximage);
         XCloseDisplay(display);
         display = nullptr;
     }
