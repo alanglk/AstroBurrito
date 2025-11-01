@@ -1,5 +1,12 @@
+
 #include "astro/graphics/graphics.hpp"
-#include "astro/math/math.hpp" 
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
+#include <utility>
 
 using namespace astro::math;
 
@@ -8,29 +15,57 @@ namespace graphics {
 
 void clearCanvas(AstroCanvas& canvas, Color color){
     int num_pixels = canvas.width * canvas.height;
-    for (int i = 0; i < num_pixels; i++){
-        canvas.data[i] = color;
-    }
+    // std::fill(canvas.data.begin(), canvas.data.end(), color);
+    std::memset(canvas.data.data(), color.r, canvas.data.size() * sizeof(Color));
 }
 
-bool isInCanvasBounds(AstroCanvas &canvas, math::Vec2i point){
-    return point.x >= 0 && point.x < canvas.width && point.y >= 0 && point.y < canvas.height;
+bool isInCanvasBounds(AstroCanvas &canvas, int x, int y){
+    return x >= 0 && x < canvas.width && y >= 0 && y < canvas.height;
 }
 
 void putPixel(AstroCanvas& canvas, int x, int y, Color color){
-    int i = y * canvas.width + x;
+    canvas.data[ASTRO_INDEX(x, y, canvas.width)] = color;
+}
+
+void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color color){
+    // Parametric implementation
+    // t(x) = (x - x1) / (x2 - x1)
+    // y(t) = y1 + (y2 - y1) * t
+
+    float vx = x2 - x1;
+    float vy = y2 - y1;
+
+    // Transpose if it is more vertical than horizontal
+    const bool transpose = std::abs(vy) > std::abs(vx);
+    if (transpose){
+        std::swap(x1, y1);
+        std::swap(x2, y2);
+        std::swap(vx, vy);
+    }
+
+    if(x1 > x2){
+    // Make it left to rigth
+        std::swap(x1, x2);
+        std::swap(y1, y2);
+    }
+    
+    if (vx == 0) return;
+    for (int x = x1; x <= x2; x++){
+        const float t = (x - x1) / (vx);
+        const int y = std::round(y1 + vy * t);
+        
+        if(!isInCanvasBounds(canvas, x, y)) continue;
+        if (transpose) {
+            putPixel(canvas, y, x, color);
+        } else {
+            putPixel(canvas, x, y, color);
+        }
+    }
 
 }
-void drawSimplePoint(AstroCanvas& canvas, Vec2i pos, Color color) {
-    
-    putPixel(canvas, pos.x, pos.y, color);
-    putPixel(canvas, pos.x, pos.y+1, color);
-    putPixel(canvas, pos.x, pos.y-1, color);
-    putPixel(canvas, pos.x+1, pos.y, color);
-    putPixel(canvas, pos.x-1, pos.y, color);
 
-
-
+void drawCircle(AstroCanvas &canvas, int x, int y, Color color){
+    throw std::runtime_error("Not implemented yet");
 }
 
 }

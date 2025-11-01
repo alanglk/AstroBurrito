@@ -6,7 +6,7 @@
 #define WIDTH 800
 #define HEIGHT 600
 #define COLOR_DEPTH 24
-using namespace astro::core;
+using namespace astro::core::platform;
 
 TEST(renderingBufferDims){
     const LayerConfig layerConfig = {

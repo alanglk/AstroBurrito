@@ -22,6 +22,7 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CXXFLAGS": "pg",
                 "ASTRO_BUILD_TESTS": "ON"
             }
         }

@@ -11,6 +11,8 @@ namespace graphics {
 using namespace astro::math;
 typedef Vector<uint8_t, 4> Color;
 
+#define ASTRO_INDEX(x, y, width) y*width+x
+
 struct AstroCanvas {
     int width;
     int height;
@@ -38,22 +40,43 @@ void clearCanvas(AstroCanvas& canvas, Color color);
  * @return true 
  * @return false 
  */
-bool isInCanvasBounds(AstroCanvas& canvas, math::Vec2i point);
+bool isInCanvasBounds(AstroCanvas& canvas, int x, int y);
 
 /**
- * @brief Draw a point of with color 'color' and size 'size' in the canvas
+ * @brief Sets a pixel color on the canvas
+ * 
+ * @param canvas 
+ * @param x 
+ * @param y 
+ * @param color 
+ */
+void putPixel(AstroCanvas& canvas, int x, int y, Color color);
+
+
+/**
+ * @brief Draw a line from (x1, y1) to (x2, y2) with color 'color'
+ * 
+ * @param canvas 
+ * @param x1 
+ * @param y1 
+ * @param x2 
+ * @param y2 
+ * @param color 
+ */
+void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color color);
+
+/**
+ * @brief Draw a circle of with color 'color' and size 'size' in the canvas
  * 
  * @param canvas 
  * @param point 
  * @param color 
  * @param size by default is one pixel
  */
-void drawPoint(AstroCanvas& canvas, math::Vec2i point, Color color, uint size = 1);
+void drawCircle(AstroCanvas& canvas, int x, int y, Color color, uint size = 1);
 
 
 
-void putPixel(AstroCanvas& canvas, int x, int y, Color color);
-void drawSimplePoint(AstroCanvas& canvas, Vec2i pos, Color color);
 
 
 }

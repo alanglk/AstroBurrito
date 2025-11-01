@@ -1,11 +1,12 @@
 #pragma once
-#include <cstddef>
+
 #include <cstdint>
 #include <string>
 
 namespace astro {
 namespace core {
-    
+namespace platform {
+
 
 enum class LayerEventType : uint32_t {
     EvtNone                     = 0,            // No layer events
@@ -76,5 +77,6 @@ struct LayerEvent {
     } data;
 };
 
+}
 }
 }

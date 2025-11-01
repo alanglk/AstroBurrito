@@ -1,10 +1,9 @@
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
-#include <string>
 #include <thread>
 
 // TODO: Factory for PlatformLayer
@@ -14,51 +13,13 @@
 #include "astro/graphics/graphics.hpp"
 #include "astro/math/math.hpp"
 
-using namespace astro::core;
+using namespace astro::core::platform;
 using namespace astro::graphics;
 
 #define WIDTH 800
 #define HEIGHT 600
 #define COLOR_DEPTH 24
 
-void getRainbowColor(Color& color, int iteration_num) {
-    const int step_size = 25;
-    int phase = (iteration_num / step_size) % 6; 
-    int color_val = iteration_num % (255 * 6 / step_size); 
-
-    // Reset all components to 0 and set Alpha to full (255)
-    color.r = 0;
-    color.g = 0;
-    color.b = 0;
-    color.a = 255; 
-
-    switch (phase) {
-        case 0: // Red -> Yellow (Green is rising)
-            color.r = 255;
-            color.g = color_val;
-            break;
-        case 1: // Yellow -> Green (Red is falling)
-            color.g = 255;
-            color.r = 255 - color_val;
-            break;
-        case 2: // Green -> Cyan (Blue is rising)
-            color.g = 255;
-            color.b = color_val;
-            break;
-        case 3: // Cyan -> Blue (Green is falling)
-            color.b = 255;
-            color.g = 255 - color_val;
-            break;
-        case 4: // Blue -> Magenta (Red is rising)
-            color.b = 255;
-            color.r = color_val;
-            break;
-        case 5: // Magenta -> Red (Blue is falling)
-            color.r = 255;
-            color.b = 255 - color_val;
-            break;
-    }
-}
 
 int main(){
     std::cout << "AstroBurrito project\n";
@@ -75,8 +36,14 @@ int main(){
 
     
     AstroCanvas canvas(WIDTH, HEIGHT);
-    Color clearColor = {0, 255, 0, 255}; // White color
+    Color clearColor = {10, 10, 10, 255}; // White color
     clearCanvas(canvas, clearColor);
+    Vec2i A = {WIDTH/2 -200, HEIGHT/2 + 100};
+    Vec2i B = {WIDTH/2 -150, HEIGHT/2 - 100};
+    Vec2i C = {WIDTH/2 +200, HEIGHT/2 - 200};
+    Color red   = {255, 0, 0, 255};
+    Color green = {0, 255, 0, 255};
+    Color blue  = {0, 0, 255, 255};
     int i = 0;
     
     LayerEvent event;
@@ -115,8 +82,14 @@ int main(){
         }
         
         // Rainbow clear
-        getRainbowColor(clearColor, i);
         clearCanvas(canvas,  clearColor);
+        int delta_y = 5*sin(0.05* i);
+        A.y += delta_y;
+        B.y += delta_y;
+        C.y += delta_y;
+        drawLine(canvas, A.x, A.y, B.x, B.y, red);
+        drawLine(canvas, B.x, B.y, C.x, C.y, green);
+        drawLine(canvas, C.x, C.y, A.x, A.y, blue);
         i++;
         
         // Render

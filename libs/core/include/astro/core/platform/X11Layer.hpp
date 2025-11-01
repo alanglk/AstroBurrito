@@ -10,7 +10,8 @@
 
 namespace astro {
 namespace core {
-    
+namespace platform {
+
 class X11Layer : public IPlatformLayer {
 public:
     X11Layer() = default;
@@ -41,5 +42,6 @@ private:
 
 };
 
+}
 }
 }

@@ -4,6 +4,8 @@
 #include "astro/graphics/graphics.hpp"
 
 #include <clocale>
+#include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <sys/types.h>
@@ -15,10 +17,12 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <vector>
 
 namespace astro {
 namespace core {
-    
+namespace platform {
+
     void X11Layer::initialize(const LayerConfig& layerConfig){
         display = XOpenDisplay(NULL); // Create connection with XServer
         window = XCreateSimpleWindow(
@@ -78,6 +82,7 @@ namespace core {
         // Line padding for the XImage. Often 32 or 8. 
         int bitmap_pad = XBitmapPad(display);
         XImage* sample_image = XCreateImage( display, visual, depth, ZPixmap, 0, nullptr, windowWidth, windowHeight, bitmap_pad, 0);
+        depth = sample_image->depth;
         bitmap_pad = sample_image->bitmap_pad;
         int bytes_per_line = sample_image->bytes_per_line;
         XDestroyImage(sample_image);
@@ -208,35 +213,19 @@ namespace core {
     void X11Layer::render(graphics::AstroCanvas& canvas) {
 
         // Fill the internal XImage with Canvas data
-        int bytes_per_pixel = ximage->bits_per_pixel / 8;
-        int pixel_index = 0; 
+        const int bpp = ximage->bits_per_pixel / 8;     // bytes per pixel
+        const int bpr = windowWidth * bpp;              // bytes per row
+        const int ppr = ximage->bytes_per_line / bpp;   // pixels per row
+        const int depth = ximage->depth;
+        const size_t pixel_count = canvas.data.size();
+        
+        unsigned char* dst = reinterpret_cast<unsigned char*>(ximage->data);
+        const auto* src = canvas.data.data();
+        
         for (int y = 0; y < windowHeight; ++y) {
-            int line_start_offset = y * ximage->bytes_per_line;
-
-            for (int x = 0; x < windowWidth; ++x) {
-                if (pixel_index >= canvas.data.size()) {
-                    break; 
-                }
-
-                int pixel_offset = line_start_offset + (x * bytes_per_pixel);
-                const auto& pixel = canvas.data[pixel_index];
-
-                // Fill with pixel data
-                rendering_buffer[pixel_offset]     = pixel.b; // Blue
-                rendering_buffer[pixel_offset + 1] = pixel.g; // Green
-                rendering_buffer[pixel_offset + 2] = pixel.r; // Red
-
-                // Alpha
-                if (bytes_per_pixel == 4) {
-                    rendering_buffer[pixel_offset + 4] = pixel.a;
-                }
-                
-                pixel_index++;
-            }
-
-            if (pixel_index >= canvas.data.size()) {
-                break;
-            }
+            unsigned char* row = dst + y * ximage->bytes_per_line;
+            const auto* src_row = src + static_cast<size_t>(y) * windowWidth;
+            std::memcpy(row, src_row, bpr);
         }
         
         // Actual rendering
@@ -245,19 +234,33 @@ namespace core {
     }
     
     void X11Layer::close(){
-        // Already closed or never initialized
-        if (display == nullptr) return; 
+
+        // Destroy input context
+        if (inputContext != nullptr){
+            XDestroyIC(inputContext);
+            inputContext = nullptr;
+        }
+
+        // Close input method
+        if (inputMethod != nullptr) {
+            XCloseIM(inputMethod);
+            inputMethod = nullptr;
+        }
+        
 
         // Destroy the XImage structure (frees the XImage struct, but NOT the underlying buffer)
         if (ximage != nullptr) {
-            // delete ximage; ximage = nullptr;
-            // XDestroyImage(ximage); 
+            // change reference to new empty buffer for destruction
+            rendering_buffer = std::vector<uint8_t>(); 
+            ximage->data = nullptr;
+            XDestroyImage(ximage); // this deallocates nullptr
             ximage = nullptr;
         }
 
         // Free the Graphical Context (GC)
-        if (gc != 0) {
+        if (gc != nullptr) {
             XFreeGC(display, gc); gc = 0;
+            gc = nullptr;
         }
 
         // Destroy the Window
@@ -266,10 +269,14 @@ namespace core {
         }
 
         // Close the connection to the X Server and flush all pending requests
-        XDestroyImage(ximage);
-        XCloseDisplay(display);
-        display = nullptr;
+        if (display != nullptr) {
+            XCloseDisplay(display);
+            display = nullptr;
+        } 
+        
+        
     }
 
+}
 }
 }

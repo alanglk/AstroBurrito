@@ -4,6 +4,7 @@
 
 namespace astro {
 namespace core {
+namespace platform {
 
 class IPlatformLayer {
 public:
@@ -25,5 +26,6 @@ public:
 
 };
 
+}
 }
 }
