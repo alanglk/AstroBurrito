@@ -13,6 +13,10 @@ target_include_directories(astro_graphics
 target_link_libraries(astro_graphics PUBLIC astro_math)
 
 # Add tests for this lib (only if ASTRO_BUILD_TESTS=ON)
-astro_add_tests(astro_graphics SOURCES
+astro_add_tests(astro_graphics 
+    SOURCES
     tests/graphics_tests.cpp
+    
+    LIBS
+    astro_core
 )

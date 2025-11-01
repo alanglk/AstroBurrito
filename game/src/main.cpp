@@ -38,18 +38,10 @@ int main(){
     AstroCanvas canvas(WIDTH, HEIGHT);
     Color clearColor = {10, 10, 10, 255}; // White color
     clearCanvas(canvas, clearColor);
-    Vec2i A = {WIDTH/2 -200, HEIGHT/2 + 100};
-    Vec2i B = {WIDTH/2 -150, HEIGHT/2 - 100};
-    Vec2i C = {WIDTH/2 +200, HEIGHT/2 - 200};
-    Color red   = {255, 0, 0, 255};
-    Color green = {0, 255, 0, 255};
-    Color blue  = {0, 0, 255, 255};
-    int i = 0;
     
     LayerEvent event;
     bool shouldClose = false;
     while(!shouldClose){
-        
         
         // Process layer event
         console->processEvents(event);
@@ -81,16 +73,8 @@ int main(){
             }
         }
         
-        // Rainbow clear
+        // Clear
         clearCanvas(canvas,  clearColor);
-        int delta_y = 5*sin(0.05* i);
-        A.y += delta_y;
-        B.y += delta_y;
-        C.y += delta_y;
-        drawLine(canvas, A.x, A.y, B.x, B.y, red);
-        drawLine(canvas, B.x, B.y, C.x, C.y, green);
-        drawLine(canvas, C.x, C.y, A.x, A.y, blue);
-        i++;
         
         // Render
         console->render(canvas);

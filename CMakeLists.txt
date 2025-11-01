@@ -16,21 +16,30 @@ endif()
 # Helper function for adding test compilation support
 function(astro_add_tests target)
     if(ASTRO_BUILD_TESTS)
-        # Remaining args after target are test sources
+        # Argument categories
         set(options "")
         set(oneValueArgs "")
-        set(multiValueArgs SOURCES)
+        set(multiValueArgs SOURCES HEADERS LIBS)
         cmake_parse_arguments(ASTRO_ADD_TESTS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
+        # SOURCES are required
         if(NOT ASTRO_ADD_TESTS_SOURCES)
             message(FATAL_ERROR "astro_add_tests(${target}) requires SOURCES")
         endif()
 
-        add_executable(${target}_tests ${ASTRO_ADD_TESTS_SOURCES})
+        # Create test executable
+        add_executable(${target}_tests
+            ${ASTRO_ADD_TESTS_SOURCES}
+            ${ASTRO_ADD_TESTS_HEADERS}
+        )
 
-        # Link the library under test
-        target_link_libraries(${target}_tests PRIVATE ${target})
-        # Add include path for astro_test.hpp
+        # Link main target and optional libs
+        target_link_libraries(${target}_tests PRIVATE
+            ${target}
+            ${ASTRO_ADD_TESTS_LIBS}
+        )
+
+        # Include test framework path
         target_include_directories(${target}_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/libs/test
         )

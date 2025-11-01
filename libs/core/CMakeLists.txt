@@ -32,6 +32,7 @@ if(UNIX)
         PRIVATE
             ${X11_LIBRARIES}
     )
+    target_compile_definitions(astro_core PUBLIC ASTRO_HAS_X11)
 
     # Add tests for X11Layer (only if ASTRO_BUILD_TESTS=ON)
     astro_add_tests(astro_core SOURCES
