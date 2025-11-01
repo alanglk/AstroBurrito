@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdint>
+#include <cstring>
 #include <initializer_list>
 #include <ostream>
 #include <stdexcept>
@@ -15,12 +15,16 @@ namespace math {
 // ========================================================
 template<typename T, int N>
 struct Vector {
+    using value_type = T;
+    static constexpr int rows = N;
+    static constexpr int cols = 1;
+
     T data[N];
     Vector() = default; // No initialization
     explicit Vector(const T& val){     // Scalar initialization
         std::fill(data, data+N, val);
     };
-    Vector(const Vector<T, N>& vec){ // Copy-Constructor
+    Vector(Vector<T, N>& vec){ // Copy-Constructor
         for (int i = 0; i < N; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
@@ -36,6 +40,16 @@ struct Vector {
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
     
+    // Other matrix-like access operators
+    T& operator()(int r, int c = 0) {
+        if (c != 0 || r < 0 || r >= N) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+    const T& operator()(int r, int c = 0) const {
+        if (c != 0 || r < 0 || r >= N) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+    
     // Assignment operators
     Vector<T, N>& operator=(const T& val){
         std::fill(data, data+N, val);
@@ -44,17 +58,22 @@ struct Vector {
 };
 
 template<typename T> struct Vector<T, 2> {
+    using value_type = T;
+    static constexpr int rows = 2;
+    static constexpr int cols = 1;
+
     union {
         T data[2]; 
         struct { T x, y; };
     };
     Vector() = default; // No initialization
-    explicit Vector(const T& val) : data(val, val) {} // Scalar fill
-    Vector(const Vector<T, 2>& vec){ // Copy-Constructor
-        for (int i = 0; i < 2; i++) data[i] = vec[i];
+    Vector(const T& val) : data(val, val) {} // Scalar fill
+    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+        for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
+    Vector(T x, T y): data(x, y) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
-        if(list.size() != 2) 
+        if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
         int i = 0;
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
@@ -64,26 +83,41 @@ template<typename T> struct Vector<T, 2> {
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
 
+    // Other matrix-like access operators
+    T& operator()(int r, int c = 0) {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+    const T& operator()(int r, int c = 0) const {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+
     // Assignment operators
-    Vector<T, 2>& operator=(const T& val){
-        std::fill(data, data+2, val);
+    Vector<T, rows>& operator=(const T& val){
+        std::fill(data, data+rows, val);
         return *this;
     }
 };
 
 template<typename T> struct Vector<T, 3> {
+    using value_type = T;
+    static constexpr int rows = 3;
+    static constexpr int cols = 1;
+
     union {
         T data[3]; 
         struct{ T x, y, z; };
         struct { T r, g, b; };
     };
     Vector() = default; // No initialization
-    explicit Vector(const T& val) : data(val, val, val) {} // Scalar fill
-    Vector(const Vector<T, 3>& vec){ // Copy-Constructor
-        for (int i = 0; i < 3; i++) data[i] = vec[i];
+    Vector(const T& val) : data(val, val, val) {} // Scalar fill
+    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+        for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
+    Vector(T x, T y, T z): data(x, y, z) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
-        if(list.size() != 3) 
+        if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
         int i = 0;
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
@@ -93,14 +127,28 @@ template<typename T> struct Vector<T, 3> {
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
 
+    // Other matrix-like access operators
+    T& operator()(int r, int c = 0) {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+    const T& operator()(int r, int c = 0) const {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+
     // Assignment operators
-    Vector<T, 3>& operator=(const T& val){
-        std::fill(data, data+3, val);
+    Vector<T, rows>& operator=(const T& val){
+        std::fill(data, data+rows, val);
         return *this;
     }
 };
 
 template<typename T> struct Vector<T, 4> {
+    using value_type = T;
+    static constexpr int rows = 4;
+    static constexpr int cols = 1;
+
     union {
         T data[4]; 
         struct { T x, y, z, w; };
@@ -110,12 +158,13 @@ template<typename T> struct Vector<T, 4> {
         Vector<T, 3> rgb;
     };
     Vector() = default; // No initialization
-    explicit Vector(const T& val) : data(val, val, val, val) {} // scalar fill
-    Vector(const Vector<T, 4>& vec){ // Copy-Constructor
-        for (int i = 0; i < 4; i++) data[i] = vec[i];
+    Vector(const T& val) : data(val, val, val, val) {} // Scalar fill
+    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+        for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
+    Vector(T x, T y, T z, T w): data(x, y, z, w) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
-        if(list.size() != 4) 
+        if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
         int i = 0;
         for(auto it = list.begin(); it != list.end(); ++it, ++i){ data[i] = *it; }
@@ -125,9 +174,19 @@ template<typename T> struct Vector<T, 4> {
     T& operator[](int i) { return data[i]; }
     const T& operator[](int i) const { return data[i]; }
 
+    // Other matrix-like access operators
+    T& operator()(int r, int c = 0) {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+    const T& operator()(int r, int c = 0) const {
+        if (c != 0 || r < 0 || r >= rows) throw std::out_of_range("Vector index out of bounds");
+        return data[r];
+    }
+
     // Assignment operators
-    Vector<T, 4>& operator=(const T& val){
-        std::fill(data, data+4, val);
+    Vector<T, rows>& operator=(const T& val){
+        std::fill(data, data+rows, val);
         return *this;
     }
 };
@@ -140,6 +199,7 @@ typedef Vector<float, 4> Vec4f;
 typedef Vector<int, 2> Vec2i;
 
 typedef Vector<uint, 4> Color32;
+
 
 // Vector Operators
 template<typename T, int N>
@@ -251,11 +311,14 @@ struct Matrix {
         }
         return r * M + c;
     }
-
+    
     Matrix() = delete;
     // Uniform Initialization Constructor
     explicit Matrix(const T& val) {
             std::fill(data.begin(), data.end(), val);
+    }
+    Matrix(const Matrix<T, rows, cols>& mat){ // Copy-Constructor
+        std::memcpy(this->data.data(), mat.data.data(), rows*cols);
     }
     Matrix(const std::initializer_list<T> &list){ // List initialization
         if(N*M != list.size()) 
@@ -282,7 +345,19 @@ struct Matrix {
         return data[index(r, c)];
     }
 
+    // Static identity matrix creation
+    static Matrix<T, N, M> Identity(const T& diag_val = static_cast<T>(1)) {
+        static_assert(N == M, "Identity matrix must be square");
+        Matrix<T, N, M> res(static_cast<T>(0));
+        for (int i = 0; i < N; ++i)
+            res(i, i) = diag_val;
+        return res;
+    }
+    
+
 };
+
+typedef Matrix<float, 4, 4> Mat4f;
 
 template<typename T, int N, int M>
 struct Matrix_View {
@@ -309,7 +384,7 @@ struct Matrix_View {
     // Deleted default constructor (must initialize with data)
     Matrix_View() = delete; 
     // **Integration Point:** Constructor to create a view from an owning matrix.
-    Matrix_View(Matrix<T, N, M>& other) : data(other.data.data()) {}
+    explicit Matrix_View(Matrix<T, N, M>& other) : data(other.data.data()) {}
 
     // Access operators
     T& operator()(int r, int c) {
@@ -360,6 +435,44 @@ template <MatrixLike MatA, MatrixLike MatB>
 requires (MatA::rows == MatB::rows && MatA::cols == MatB::cols)
 bool operator!=(const MatA& A, const MatB& B) {
     return !(A == B);
+}
+
+// Matrix * Matrix
+template <MatrixLike MatA, MatrixLike MatB>
+requires (MatA::cols == MatB::rows)
+Matrix<typename MatA::value_type, MatA::rows, MatB::cols>
+operator*(const MatA& A, const MatB& B) {
+    using T = typename MatA::value_type;
+    Matrix<T, MatA::rows, MatB::cols> res(static_cast<T>(0));
+
+    for (int i = 0; i < MatA::rows; ++i)
+        for (int j = 0; j < MatB::cols; ++j)
+            for (int k = 0; k < MatA::cols; ++k)
+                res(i, j) += A(i, k) * B(k, j);
+    return res;
+}
+
+
+// Matrix * Vector
+template <MatrixLike MatA, typename T, int N>
+requires (MatA::cols == N)
+Vector<T, MatA::rows> operator*(const MatA& A, const Vector<T, N>& v) {
+    Vector<T, MatA::rows> res(static_cast<T>(0));
+    for (int i = 0; i < MatA::rows; ++i)
+        for (int j = 0; j < MatA::cols; ++j)
+            res[i] += A(i, j) * v[j];
+    return res;
+}
+
+// Vector * Matrix
+template <typename T, int N, MatrixLike MatB>
+requires (MatB::rows == N)
+Vector<T, MatB::cols> operator*(const Vector<T, N>& v, const MatB& B) {
+    Vector<T, MatB::cols> res(static_cast<T>(0));
+    for (int j = 0; j < MatB::cols; ++j)
+        for (int k = 0; k < MatB::rows; ++k)
+            res[j] += v[k] * B(k, j);
+    return res;
 }
 
 

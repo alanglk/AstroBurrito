@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <functional>
+#include <stdexcept>
 #include <vector>
 
 #define ASSERT_EQ(actual, expected) \
@@ -43,7 +44,7 @@ inline std::vector<Test>& tests(){
 
 inline bool run_all_tests(){
     bool all_success = true;
-    for(const auto test: tests()){
+    for(const auto& test: tests()){
         if(test.func()){
             std::cout << "PASSED ✅ ";
         }else{
@@ -58,4 +59,16 @@ inline bool run_all_tests(){
     }
     
     return all_success;
+}
+
+inline bool run_test(const std::string& test_name){
+    const Test* found = nullptr;
+    for (const auto& test : tests()){
+        if(test.name.compare(test_name) == 0){
+            found = &test;
+        }
+    }
+
+    if(found == nullptr) throw std::runtime_error("There is no test named '" + test_name + "'");
+    return found->func();
 }
