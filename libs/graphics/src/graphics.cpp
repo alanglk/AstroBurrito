@@ -13,21 +13,20 @@ using namespace astro::math;
 namespace astro {
 namespace graphics {
 
-void clearCanvas(AstroCanvas& canvas, Color color){
+void clearCanvas(AstroCanvas& canvas, Color &color){
     int num_pixels = canvas.width * canvas.height;
-    // std::fill(canvas.data.begin(), canvas.data.end(), color);
-    std::memset(canvas.data.data(), color.r, canvas.data.size() * sizeof(Color));
+    std::fill(canvas.data.begin(), canvas.data.end(), color);
 }
 
 bool isInCanvasBounds(AstroCanvas &canvas, int x, int y){
     return x >= 0 && x < canvas.width && y >= 0 && y < canvas.height;
 }
 
-void putPixel(AstroCanvas& canvas, int x, int y, Color color){
+void putPixel(AstroCanvas& canvas, int x, int y, Color &color){
     canvas.data[ASTRO_INDEX(x, y, canvas.width)] = color;
 }
 
-void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color color){
+void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color &color){
     // Parametric implementation
     // t(x) = (x - x1) / (x2 - x1)
     // y(t) = y1 + (y2 - y1) * t
@@ -54,17 +53,19 @@ void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color color){
         const float t = (x - x1) / (vx);
         const int y = std::round(y1 + vy * t);
         
-        if(!isInCanvasBounds(canvas, x, y)) continue;
         if (transpose) {
-            putPixel(canvas, y, x, color);
-        } else {
+            if(isInCanvasBounds(canvas, y, x))
+                putPixel(canvas, y, x, color);
+            continue;
+        } 
+
+        if(isInCanvasBounds(canvas, x, y))
             putPixel(canvas, x, y, color);
-        }
     }
 
 }
 
-void drawCircle(AstroCanvas &canvas, int x, int y, Color color){
+void drawCircle(AstroCanvas &canvas, int x, int y, Color &color){
     throw std::runtime_error("Not implemented yet");
 }
 

@@ -9,7 +9,18 @@ namespace astro {
 namespace graphics {
 
 using namespace astro::math;
-typedef Vector<uint8_t, 4> Color;
+struct Color : public Vector<uint8_t, 4> {
+    
+    // Inherit all of the base class's constructors
+    using Vector<uint8_t, 4>::Vector;
+
+    // Initialize from RGB parameters and set A as 255
+    constexpr Color(uint8_t r, uint8_t g, uint8_t b)
+        : Vector<uint8_t, 4>(r, g, b, 255) {} 
+    // Override 4 elements constructor (to get rgba name completion)
+    constexpr Color(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+        : Vector<uint8_t, 4>(r, g, b, a) {} 
+};
 
 #define ASTRO_INDEX(x, y, width) y*width+x
 
@@ -30,7 +41,7 @@ struct AstroCanvas {
  * @param canvas 
  * @param color 
  */
-void clearCanvas(AstroCanvas& canvas, Color color);
+void clearCanvas(AstroCanvas& canvas, Color &color);
 
 /**
  * @brief Checks wheter the point is in the canvas or not
@@ -50,7 +61,7 @@ bool isInCanvasBounds(AstroCanvas& canvas, int x, int y);
  * @param y 
  * @param color 
  */
-void putPixel(AstroCanvas& canvas, int x, int y, Color color);
+void putPixel(AstroCanvas& canvas, int x, int y, Color &color);
 
 
 /**
@@ -63,7 +74,7 @@ void putPixel(AstroCanvas& canvas, int x, int y, Color color);
  * @param y2 
  * @param color 
  */
-void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color color);
+void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color &color);
 
 /**
  * @brief Draw a circle of with color 'color' and size 'size' in the canvas

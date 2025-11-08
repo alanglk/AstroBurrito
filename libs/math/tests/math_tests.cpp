@@ -121,7 +121,8 @@ TEST(VecSum) {
     Vec4f b3(8.0);
     ASSERT_EQ(a1 + a2, a3);
     
-    return true;
+    // TODO: ADD SCALAR SUM TEST
+    return false;
 }
 
 TEST(VecDifference) {
@@ -136,7 +137,8 @@ TEST(VecDifference) {
     Vec4f b3(-2.0);
     ASSERT_EQ(a1 - a2, a3);
     
-    return true;
+    // TODO: ADD SCALAR DIFF TEST
+    return false;
 }
 
 TEST(VecProduct) {
@@ -151,7 +153,8 @@ TEST(VecProduct) {
     Vec4f b3(15.0);
     ASSERT_EQ(a1 * a2, a3);
     
-    return true;
+    // TODO: ADD SCALAR PROD TEST
+    return false;
 }
  
 TEST(VecDivision) {
@@ -176,7 +179,8 @@ TEST(VecDivision) {
     Vec2i c3(2);
     ASSERT_EQ(c1 / c2, c3);
 
-    return true;
+    // TODO: ADD SCALAR DIV TEST
+    return false;
 }
 
 TEST(VecLen){

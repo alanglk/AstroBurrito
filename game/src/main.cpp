@@ -36,7 +36,7 @@ int main(){
 
     
     AstroCanvas canvas(WIDTH, HEIGHT);
-    Color clearColor = {10, 10, 10, 255}; // White color
+    Color clearColor(15, 15, 15);
     clearCanvas(canvas, clearColor);
     
     LayerEvent event;

@@ -21,10 +21,10 @@ struct Vector {
 
     T data[N];
     Vector() = default; // No initialization
-    explicit Vector(const T& val){     // Scalar initialization
+    constexpr Vector(const T& val){     // Scalar initialization
         std::fill(data, data+N, val);
     };
-    Vector(Vector<T, N>& vec){ // Copy-Constructor
+    constexpr Vector(Vector<T, N>& vec){ // Copy-Constructor
         for (int i = 0; i < N; i++) data[i] = vec[i];
     }
     Vector(const std::initializer_list<T> &list){ // List initialization
@@ -67,11 +67,11 @@ template<typename T> struct Vector<T, 2> {
         struct { T x, y; };
     };
     Vector() = default; // No initialization
-    Vector(const T& val) : data(val, val) {} // Scalar fill
-    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+    constexpr Vector(const T& val) : data(val, val) {} // Scalar fill
+    constexpr Vector(const Vector<T, rows>& vec){ // Copy-Constructor
         for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
-    Vector(T x, T y): data(x, y) {};
+    constexpr Vector(T x, T y): data(x, y) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
@@ -111,11 +111,11 @@ template<typename T> struct Vector<T, 3> {
         struct { T r, g, b; };
     };
     Vector() = default; // No initialization
-    Vector(const T& val) : data(val, val, val) {} // Scalar fill
-    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+    constexpr Vector(const T& val) : data(val, val, val) {} // Scalar fill
+    constexpr Vector(const Vector<T, rows>& vec){ // Copy-Constructor
         for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
-    Vector(T x, T y, T z): data(x, y, z) {};
+    constexpr Vector(T x, T y, T z): data(x, y, z) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
@@ -158,11 +158,11 @@ template<typename T> struct Vector<T, 4> {
         Vector<T, 3> rgb;
     };
     Vector() = default; // No initialization
-    Vector(const T& val) : data(val, val, val, val) {} // Scalar fill
-    Vector(const Vector<T, rows>& vec){ // Copy-Constructor
+    constexpr Vector(const T& val) : data(val, val, val, val) {} // Scalar fill
+    constexpr Vector(const Vector<T, rows>& vec){ // Copy-Constructor
         for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
-    Vector(T x, T y, T z, T w): data(x, y, z, w) {};
+    constexpr Vector(T x, T y, T z, T w): data(x, y, z, w) {};
     Vector(const std::initializer_list<T> &list){ // List initialization
         if(list.size() != rows) 
             throw std::runtime_error("Mismatch initializer list and vector lengths");
@@ -229,6 +229,16 @@ bool operator!=(const Vector<T, N>& a, const Vector<T, N>& b) {
 }
 
 /**
+ * @brief Scalar vector sum
+ * @return Vector<T, N> difference vector
+ */
+template<typename T, int N>
+Vector<T, N> operator+(const Vector<T, N>& a, const T val) {
+    Vector<T, N> res; 
+    for(int i = 0; i < N; i++) res.data[i] = a.data[i] + val;
+    return res; 
+}
+/**
  * @brief Element wise vector sum
  * @return Vector<T, N> summed vector
  */
@@ -237,6 +247,15 @@ Vector<T, N> operator+(const Vector<T, N>& a, const Vector<T, N>& b) {
     Vector<T, N> res; 
     for(int i = 0; i < N; i++) res.data[i] = a.data[i] + b.data[i];
     return res; 
+}
+
+/**
+ * @brief Scalar vector difference
+ * @return Vector<T, N> difference vector
+ */
+template<typename T, int N>
+Vector<T, N> operator-(const Vector<T, N>& a, const T val) {
+    return a + (-val); 
 }
 
 /**
@@ -251,6 +270,16 @@ Vector<T, N> operator-(const Vector<T, N>& a, const Vector<T, N>& b) {
 }
 
 /**
+ * @brief Scalar vector product
+ * @return Vector<T, N> elm-product vector
+ */
+template<typename T, int N>
+Vector<T, N> operator*(const Vector<T, N>& a, const T& val) {
+    Vector<T, N> res; 
+    for(int i = 0; i < N; i++) res.data[i] = a.data[i] * val;
+    return res; 
+}
+/**
  * @brief Element wise vector product
  * @return Vector<T, N> elm-product vector
  */
@@ -258,6 +287,20 @@ template<typename T, int N>
 Vector<T, N> operator*(const Vector<T, N>& a, const Vector<T, N>& b) {
     Vector<T, N> res; 
     for(int i = 0; i < N; i++) res.data[i] = a.data[i] * b.data[i];
+    return res; 
+}
+
+/**
+ * @brief Scalar vector division
+ * @return Vector<T, N> elm-division vector
+ */
+template<typename T, int N>
+Vector<T, N> operator/(const Vector<T, N>& a, const T& val) {
+    if(val == 0.0) throw std::runtime_error("Division by 0");
+    Vector<T, N> res; 
+    for(int i = 0; i < N; i++) {
+        res.data[i] = a.data[i] / val;
+    }
     return res; 
 }
 
@@ -357,6 +400,7 @@ struct Matrix {
 
 };
 
+typedef Matrix<float, 3, 3> Mat3f;
 typedef Matrix<float, 4, 4> Mat4f;
 
 template<typename T, int N, int M>

@@ -106,6 +106,17 @@ namespace platform {
             throw std::runtime_error("[X11Layer] ERROR: Failed to create XImage structure.");
         }
         
+        // Set up rendering config
+        const int x_bpp = ximage->bits_per_pixel / 8;   // Bytes per pixel for XImage (e.g., 4)
+        const int x_bpr = ximage->bytes_per_line;       // Total bytes per line for XImage (includes padding)
+
+        // Pre-calculate format checks to avoid branching in the inner loop
+        const bool is_32bit = (x_bpp == 4);
+        const bool is_lsb = (is_32bit && ximage->byte_order == LSBFirst);
+        const bool is_msb = (is_32bit && ximage->byte_order == MSBFirst);
+        const bool is_24bit_lsb = (x_bpp == 3 && ximage->byte_order == LSBFirst);
+        const bool is_24bit_msb = (x_bpp == 3 && ximage->byte_order == MSBFirst);
+        m_xrendering = RenderConfig(x_bpp, x_bpr, is_32bit, is_lsb, is_msb, is_24bit_lsb, is_24bit_msb);
     }
 
     long X11Layer::layerEventToX11(LayerEventType requestedEvents) {
@@ -211,21 +222,58 @@ namespace platform {
     }
 
     void X11Layer::render(graphics::AstroCanvas& canvas) {
+        // Destination buffer
+        unsigned char* dst_data = reinterpret_cast<unsigned char*>(ximage->data);
 
-        // Fill the internal XImage with Canvas data
-        const int bpp = ximage->bits_per_pixel / 8;     // bytes per pixel
-        const int bpr = windowWidth * bpp;              // bytes per row
-        const int ppr = ximage->bytes_per_line / bpp;   // pixels per row
-        const int depth = ximage->depth;
-        const size_t pixel_count = canvas.data.size();
-        
-        unsigned char* dst = reinterpret_cast<unsigned char*>(ximage->data);
-        const auto* src = canvas.data.data();
-        
+        // Get a pointer to the start of the canvas's pixel data
+        const graphics::Color* src_data = canvas.data.data();
+        const size_t canvas_width = static_cast<size_t>(canvas.width);
+
+        // Pixel-by-pixel conversion loop
         for (int y = 0; y < windowHeight; ++y) {
-            unsigned char* row = dst + y * ximage->bytes_per_line;
-            const auto* src_row = src + static_cast<size_t>(y) * windowWidth;
-            std::memcpy(row, src_row, bpr);
+            // Advance the source pointer by one full row (width * sizeof(Color))
+            const graphics::Color* src_row = src_data + y * canvas_width;
+            
+            // Advance the destination pointer by the XImage's bytes_per_line (which includes padding)
+            unsigned char* dst_row = dst_data + y * m_xrendering.x_bpr;
+
+            // Cast destination row to uint32_t* (for writing a pixel at once)
+            uint32_t* dst_row_32 = reinterpret_cast<uint32_t*>(dst_row);
+
+            for (int x = 0; x < windowWidth; ++x) {
+                // Get the source pixel (RGBA) by simple array indexing
+                const graphics::Color& src_pixel = src_row[x]; 
+
+                // 2. Perform format conversion and write
+                if (m_xrendering.is_lsb) {
+                    // LSBFirst -> BGRA format
+                    dst_row_32[x] = (src_pixel[2]) |        // Blue
+                                  (src_pixel[1] << 8) |     // Green
+                                  (src_pixel[0] << 16) |    // Red
+                                  (src_pixel[3] << 24);     // Alpha (or 255 << 24)
+                } 
+                else if (m_xrendering.is_msb) {
+                    // MSBFirst -> ARGB format
+                    dst_row_32[x] = (src_pixel[3] << 24) |  // Alpha
+                                  (src_pixel[0] << 16) |    // Red
+                                  (src_pixel[1] << 8) |     // Green
+                                  (src_pixel[2]);           // Blue
+                }
+                else if (m_xrendering.is_24bit_lsb) {
+                    // 24-bit BGR format (fallback, slower)
+                    unsigned char* dst_pixel = dst_row + x * 3;
+                    dst_pixel[0] = src_pixel[2]; // Blue
+                    dst_pixel[1] = src_pixel[1]; // Green
+                    dst_pixel[2] = src_pixel[0]; // Red
+                }
+                else if (m_xrendering.is_24bit_msb) {
+                    // 24-bit RGB format (fallback, slower)
+                    unsigned char* dst_pixel = dst_row + x * 3;
+                    dst_pixel[0] = src_pixel[0]; // Red
+                    dst_pixel[1] = src_pixel[1]; // Green
+                    dst_pixel[2] = src_pixel[2]; // Blue
+                }
+            }
         }
         
         // Actual rendering
