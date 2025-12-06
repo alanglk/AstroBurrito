@@ -3,6 +3,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -35,7 +36,9 @@ Color blue  (0, 0, 255);
 // --- Helper functions ---
 #include "astro/core/platform/IPlatformLayer.hpp"
 #include "astro/core/platform/PlatformFactory.hpp"
+#include "astro/core/io/PPMImage.hpp"
 using namespace astro::core::platform;
+
 class TestWindow {
 public:
     
@@ -135,8 +138,8 @@ TEST(wireframeDrawing){
 
     
     // Parse .obj file into array of pointsç
-    struct TriangleIDX { int v1, v2, v3 = 0;};
-    std::vector<Vec4f> points;
+    struct TriangleIDX { int v1, v2, v3;};
+    std::vector<Vec3f> points;
     std::vector<TriangleIDX> triangle_idxs;
 
     
@@ -156,17 +159,36 @@ TEST(wireframeDrawing){
         if (type == "v") {
             float x, y, z;
             ss >> x >> y >> z;
-            points.emplace_back(x, y, z, 1.0); // Homogeneous coord
+            points.emplace_back(x, y, z);
         } 
         else if (type == "f") {
             int v1, v2, v3;
-            char slash; // to skip '/' if needed
+            
             if (line.find('/') != std::string::npos) {
-                // handles f like "1/2/3 4/5/6 7/8/9"
-                std::replace(line.begin(), line.end(), '/', ' ');
-                std::istringstream fss(line);
-                fss >> type >> v1 >> v2 >> v3; // read only vertex indices
+                // Case: f v/vt/vn or f v/vt or f v//vn
+                std::istringstream fss(line.substr(line.find(' ') + 1)); // start after 'f'
+                auto read_group = [](std::istringstream& stream) -> int {
+                    int v_idx;
+                    char slash;
+                    
+                    if (!(stream >> v_idx)) return 0; 
+                    if (!(stream >> slash)) return v_idx; 
+                    
+                    int temp_idx;
+                    stream >> temp_idx; 
+                    if (stream.peek() == '/') {
+                        stream >> slash; 
+                        stream >> temp_idx; 
+                    }
+                    return v_idx;
+                };
+
+                v1 = read_group(fss);
+                v2 = read_group(fss);
+                v3 = read_group(fss);
+
             } else {
+                // Case: f v1 v2 v3 (only vertex indices)
                 ss >> v1 >> v2 >> v3;
             }
             triangle_idxs.emplace_back(v1 - 1, v2 - 1, v3 - 1);
@@ -174,26 +196,14 @@ TEST(wireframeDrawing){
     }
     fs.close();
     
-    // Projection matrices
-    float fx = WIDTH / 10.0; // Ortographic projection
-    float fy = WIDTH / 10.0; 
-    float cx = WIDTH /2.0;
-    float cy = HEIGHT /2.0;
-    
-    Mat3f K = {
-        fx, 0, cx,
-        0, fy, cy,
-        0, 0, 1
+    // Just a Viewport transform. The model is already in the NDC space
+    const std::function<Vec2i(Vec3f)> project = [](Vec3f P) {
+        int x = static_cast<int>((P.x + 1.0) * WIDTH / 2.0f);
+        int y = static_cast<int>(-1.0f * (P.y + 1.0) * (HEIGHT / 2.0f) + HEIGHT );
+        
+        return Vec2i(x, y);
     };
-    Matrix<float, 3, 4> Rt = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0
-    }; 
-    Matrix<float, 3, 4> projection_mat = K * Rt;
-
-
-
+    
     // Main loop
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
@@ -204,37 +214,29 @@ TEST(wireframeDrawing){
         for(const auto& idx: triangle_idxs) {
             
             // Get triangle vertices
-            const Vec4f v1 = points[idx.v1];
-            const Vec4f v2 = points[idx.v2];
-            const Vec4f v3 = points[idx.v3];
+            const Vec3f v1 = points[idx.v1];
+            const Vec3f v2 = points[idx.v2];
+            const Vec3f v3 = points[idx.v3];
             
             // Project vertices to clip-space
-            Vec3f v1_proj = projection_mat * v1;
-            Vec3f v2_proj = projection_mat * v2;
-            Vec3f v3_proj = projection_mat * v3;
-            
-            v1_proj.x /= v1_proj.z;
-            v1_proj.y /= v1_proj.z;
-
-            v2_proj.x /= v2_proj.z;
-            v2_proj.y /= v2_proj.z;
-
-            v3_proj.x /= v3_proj.z;
-            v3_proj.y /= v3_proj.z;
+            Vec2i v1_proj = project(v1);
+            Vec2i v2_proj = project(v2);
+            Vec2i v3_proj = project(v3);
             
             if(!isInCanvasBounds(canvas, v1_proj.x, v1_proj.y )) continue;
             if(!isInCanvasBounds(canvas, v2_proj.x, v2_proj.y )) continue;
             if(!isInCanvasBounds(canvas, v3_proj.x, v3_proj.y )) continue;
             
-            // Draw lines
             drawLine(canvas, v1_proj.x, v1_proj.y, v2_proj.x, v2_proj.y, red);
             drawLine(canvas, v2_proj.x, v2_proj.y, v3_proj.x, v3_proj.y, green);
             drawLine(canvas, v3_proj.x, v3_proj.y, v1_proj.x, v1_proj.y, blue);
-
-            // Draw vertices
-            putPixel(canvas, v1_proj.x, v1_proj.y, white);
-            putPixel(canvas, v2_proj.x, v2_proj.y, white);
-            putPixel(canvas, v3_proj.x, v3_proj.y, white);
+        }
+        
+        // Render vertices
+        for(const auto P : points){
+            const Vec2i p = project(P);
+            if(!isInCanvasBounds(canvas, p.x, p.y )) continue;
+            putPixel(canvas, p.x, p.y, white);
         }
 
         // Show on window
@@ -248,6 +250,8 @@ TEST(wireframeDrawing){
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         i++;
     }
+    
+    astro::core::io::PPMImage::writeImage("./graphics_tests.ppm", canvas);
     
     return true;
 
