@@ -2,14 +2,19 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <initializer_list>
 #include <ostream>
 #include <stdexcept>
+#include <unistd.h>
 
 namespace astro {
 namespace math {
     
+#define PI 3.14159265f
+
+
 // ========================================================
 // --- VECTOR ---------------------------------------------
 // ========================================================
@@ -196,10 +201,11 @@ typedef Vector<float, 2> Vec2f;
 typedef Vector<float, 3> Vec3f;
 typedef Vector<float, 4> Vec4f;
 
+typedef Vector<double, 2> Vec2d;
+typedef Vector<double, 3> Vec3d;
+typedef Vector<double, 4> Vec4d;
+
 typedef Vector<int, 2> Vec2i;
-
-typedef Vector<uint, 4> Color32;
-
 
 // Vector Operators
 template<typename T, int N>
@@ -329,12 +335,49 @@ T dot(const Vector<T, N>& a, const Vector<T, N>& b) {
     return res; 
 }
 
+template<typename T, int N>
+Vector<T, N> cross(const Vector<T, N>& a, const Vector<T, N>& b) {
+    static_assert(N == 3, "Cross product is only defined for 3D vectors.");
+    Vector<T, N> res;
+    res.x = a.y * b.z - a.z * b.y;
+    res.y = a.z * b.x - a.x * b.z;
+    res.z = a.x * b.y - a.y * b.x;
+    return res;
+}
+
 /**
  * @brief Get the dimension of a vector
  * @return int 
  */
 template<typename T, int N>
-int len(Vector<T, N>){ return N; }
+int dim(Vector<T, N>){ return N; }
+
+/**
+ * @brief Get the length (magnitude) of a vector
+ * @return T 
+ */
+template<typename T, int N>
+T len(Vector<T, N> vec){
+    T squareSum = 0;
+    for(int i = 0; i < N; i++) squareSum += vec.data[i] * vec.data[i];
+    return std::sqrt(squareSum);
+}
+
+/**
+ * @brief Normalize a vector (length = 1)
+ * @tparam T 
+ * @tparam N 
+ * @param vec 
+ * @return Vector<T, N> 
+ */
+template<typename T, int N>
+Vector<T, N> normalize(Vector<T, N> vec){
+    T length = len(vec);
+    if(length == 0) throw std::runtime_error("Cannot normalize zero-length vector");
+    Vector<T, N> res;
+    for(int i = 0; i < N; i++) res.data[i] = vec.data[i] / length;
+    return res;
+}
 
 
 // ========================================================

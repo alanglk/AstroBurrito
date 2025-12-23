@@ -2,6 +2,7 @@
 
 #include "astro/math/math.hpp"
 #include <cstdint>
+#include <memory>
 #include <sys/types.h>
 #include <vector>
 
@@ -9,6 +10,8 @@ namespace astro {
 namespace graphics {
 
 using namespace astro::math;
+
+// Color structure
 struct Color : public Vector<uint8_t, 4> {
     
     // Inherit all of the base class's constructors
@@ -22,18 +25,36 @@ struct Color : public Vector<uint8_t, 4> {
         : Vector<uint8_t, 4>(r, g, b, a) {} 
 };
 
-#define ASTRO_INDEX(x, y, width) y*width+x
 
+// Canvas structure
+#define ASTRO_INDEX(x, y, width) y*width+x
 struct AstroCanvas {
     int width;
     int height;
     std::vector<Color> data;
+    std::vector<double> zbuffer;
+    static constexpr double NEAR_VAL = 0.0;
+    static constexpr double FAR_VAL = 1.0;
     
     AstroCanvas(int width, int height): width(width), height(height){
-        data.resize(width*height);
+        data.resize(width*height, Color(0,0,0,255));
+        zbuffer.resize(data.size(), FAR_VAL);
     }
     
+    AstroCanvas zbuffer2Image() {
+        AstroCanvas res(width, height);
+        res.zbuffer = zbuffer;
+        for(int i = 0; i < res.zbuffer.size(); i++) {
+            double depth = zbuffer[i];
+            if (depth < 0.0) depth = 0.0;
+            if (depth > 1.0) depth = 1.0;
+            uint8_t d_val = static_cast<uint8_t>((1.0 - depth) * 255.0);
+            res.data[i] = {d_val, d_val, d_val, 255};
+        }
+        return res;
+    }
 };
+
 
 /**
  * @brief Clears the canvas with color 'color'
@@ -45,7 +66,6 @@ void clearCanvas(AstroCanvas& canvas, Color &color);
 
 /**
  * @brief Checks wheter the point is in the canvas or not
- * 
  * @param canvas 
  * @param point 
  * @return true 
@@ -55,7 +75,6 @@ bool isInCanvasBounds(AstroCanvas& canvas, int x, int y);
 
 /**
  * @brief Sets a pixel color on the canvas
- * 
  * @param canvas 
  * @param x 
  * @param y 
@@ -63,10 +82,38 @@ bool isInCanvasBounds(AstroCanvas& canvas, int x, int y);
  */
 void putPixel(AstroCanvas& canvas, int x, int y, Color &color);
 
+/**
+ * @brief Sets a pixel depth value in range [0, 1]
+ * 
+ * @param canvas 
+ * @param x 
+ * @param y 
+ * @param depth 
+ */
+void putDepth(AstroCanvas& canvas, int x, int y, double depth);
 
 /**
- * @brief Draw a line from (x1, y1) to (x2, y2) with color 'color'
+ * @brief Get the Pixel color of the AstroCanvas
  * 
+ * @param canvas 
+ * @param x 
+ * @param y 
+ * @return const Color& 
+ */
+const Color& getPixel(AstroCanvas& canvas, int x, int y);
+
+/**
+ * @brief Get the Depth value of the AstroCanvas
+ * 
+ * @param canvas 
+ * @param x 
+ * @param y 
+ * @return const double&
+*/
+const double& getDepth(AstroCanvas& canvas, int x, int y);
+
+/**
+ * @brief Draw a 2D line from A (x1, y1) to B (x2, y2) with color 'color'.
  * @param canvas 
  * @param x1 
  * @param y1 
@@ -74,21 +121,99 @@ void putPixel(AstroCanvas& canvas, int x, int y, Color &color);
  * @param y2 
  * @param color 
  */
-void drawLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color &color);
+void draw2dLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color &color);
 
 /**
- * @brief Draw a circle of with color 'color' and size 'size' in the canvas
+ * @brief Draw a 2D line from A (x1, y1) to B (x2, y2) with color 'color'.
+ * @param canvas 
+ * @param a (x1, y1)
+ * @param b (x2, y2)
+ * @param color 
+ */
+void draw2dLine(AstroCanvas& canvas, Vec2i a, Vec2i b, Color &color);
+
+/**
+* @brief Draw a 2D triangle with color 'color' in the canvas. 
+ * @param canvas 
+ * @param x1 
+ * @param y1 
+ * @param x2 
+ * @param y2 
+ * @param x3 
+ * @param y3 
+ * @param color 
+ */
+void draw2dTriangle(AstroCanvas& canvas, int x1, int y1, int x2, int y2, int x3, int y3, Color color);
+
+/**
+ * @brief Draw a 2D triangle with color 'color' in the canvas
  * 
  * @param canvas 
- * @param point 
+ * @param a (x1, y1)
+ * @param b (x2, y2)
+ * @param c (x3, y3)
  * @param color 
- * @param size by default is one pixel
  */
-void drawCircle(AstroCanvas& canvas, int x, int y, Color color, uint size = 1);
+void draw2dTriangle(AstroCanvas& canvas, Vec2i a, Vec2i b, Vec2i c, Color color);
 
 
+// 3D Rendering
+typedef Vec4f Triangle[3];
+struct Varyings {
+    Vec4f pos; 
+    Vec3f normal;
+    Vec2f uv;
+};
+struct IShader {
+    using Ptr = std::shared_ptr<IShader>; 
+    /**
+     * @brief Vertex shader (process a vertex)
+     * @param vert (4D vertex position)
+     * @return std::pair<bool, Vec3f> 
+     */
+    virtual bool vertex(const Vec4f& in_pos, Varyings& out_varying) const = 0;
 
+    /**
+     * @brief Vertex shader (process a fragment)
+     * @param frag clip-space position: 2d aliasing + depth
+     * @return std::pair<bool, Color> 
+     */
+    virtual bool fragment(const Varyings& interpolated, Color& out_color) const = 0;
+};
 
+/**
+ * @brief Basic Shader implementation. Just MVP transform and flat color
+ */
+struct BasicShader : public IShader {
+    Mat4f modelMatrix = Mat4f::Identity();
+    Mat4f viewMatrix = Mat4f::Identity();
+    Mat4f projectionMatrix = Mat4f::Identity();
+    
+    Color color = Color(255, 255, 255, 255);
+    
+    void updateMVP() {
+        MVP = projectionMatrix * viewMatrix * modelMatrix;
+    }
+    virtual bool vertex(const Vec4f& in_pos, Varyings& out_varying) const override{
+        out_varying.pos = MVP * in_pos;
+        return true;
+    }
+
+    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override {
+        out_color = color;
+        return true;
+    }
+
+private:
+    Mat4f MVP = Mat4f::Identity();
+};
+
+/**
+ * @brief 3D Renderer Pipeline
+ */
+struct TDRenderer {
+    static void renderTriangle(AstroCanvas& canvas, const Triangle& triangle, const IShader& shader);
+};
 
 }
 }
