@@ -1,5 +1,6 @@
 
 #include "astro/graphics/graphics.hpp"
+#include "astro/math/math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -21,16 +22,16 @@ bool isInCanvasBounds(AstroCanvas &canvas, int x, int y){
     return x >= 0 && x < canvas.width && y >= 0 && y < canvas.height;
 }
 void putPixel(AstroCanvas& canvas, int x, int y, Color &color){
-    canvas.data[ASTRO_INDEX(x, y, canvas.width)] = color;
+    canvas.data[canvas.index(x, y)] = color;
 }
 void putDepth(AstroCanvas& canvas, int x, int y, double depth) {
-    canvas.zbuffer[ASTRO_INDEX(x, y, canvas.width)] = depth;
+    canvas.zbuffer.at(canvas.index(x, y)) = depth;
 }
 const Color& getPixel(AstroCanvas& canvas, int x, int y) {
-    return canvas.data[ASTRO_INDEX(x, y, canvas.width)];
+    return canvas.data.at(canvas.index(x, y));
 }
 const double& getDepth(AstroCanvas& canvas, int x, int y) {
-    return canvas.zbuffer[ASTRO_INDEX(x, y, canvas.width)];
+    return canvas.zbuffer.at(canvas.index(x, y));
 }
 
 // 2D Rendering
@@ -108,15 +109,26 @@ void draw2dTriangle(AstroCanvas& canvas, Vec2i a, Vec2i b, Vec2i c, Color color)
 
 // 3D Rendering
 Varyings interpolateVaryings(const std::array<Varyings, 3>& varyings, const Vec3f& bary) {
-    Varyings result;
-    result.pos = varyings[0].pos * bary.x + varyings[1].pos * bary.y + varyings[2].pos * bary.z;
-    result.normal = varyings[0].normal * bary.x + varyings[1].normal * bary.y + varyings[2].normal * bary.z;
-    result.uv = varyings[0].uv * bary.x + varyings[1].uv * bary.y + varyings[2].uv * bary.z;
+    Varyings result{};
+    result.pos      = varyings[0].pos * bary.x + varyings[1].pos * bary.y + varyings[2].pos * bary.z;
+
+    // Flat Shading: 
+    // const Vec3f A = {varyings[0].pos.x, varyings[0].pos.y, varyings[0].pos.z};
+    // const Vec3f B = {varyings[1].pos.x, varyings[1].pos.y, varyings[1].pos.z};
+    // const Vec3f C = {varyings[2].pos.x, varyings[2].pos.y, varyings[2].pos.z};
+    // const Vec3f edgeAB = B - A;
+    // const Vec3f edgeAC = C - A;
+    // result.normal = normalize(cross(edgeAB, edgeAC));
+
+    // Smooth Shading
+    result.normal   = varyings[0].normal * bary.x + varyings[1].normal * bary.y + varyings[2].normal * bary.z;
+
+    result.uv       = varyings[0].uv * bary.x + varyings[1].uv * bary.y + varyings[2].uv * bary.z;
     return result;
 }
 void TDRenderer::renderTriangle(AstroCanvas& canvas, const Triangle& triangle, const IShader& shader) {
-    std::array<Varyings, 3> varyings;
-    std::array<Vec3f, 3> screen_pts;
+    std::array<Varyings, 3> varyings{};
+    std::array<Vec3f, 3> screen_pts{};
 
     // Vertex Processing
     for (int i = 0; i < 3; ++i) {

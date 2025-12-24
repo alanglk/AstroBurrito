@@ -27,7 +27,7 @@ struct Color : public Vector<uint8_t, 4> {
 
 
 // Canvas structure
-#define ASTRO_INDEX(x, y, width) y*width+x
+#define ASTRO_INDEX(x, y, width) 
 struct AstroCanvas {
     int width;
     int height;
@@ -40,6 +40,8 @@ struct AstroCanvas {
         data.resize(width*height, Color(0,0,0,255));
         zbuffer.resize(data.size(), FAR_VAL);
     }
+    
+    int index(int x, int y) const { return y*width+x; }
     
     AstroCanvas zbuffer2Image() {
         AstroCanvas res(width, height);
@@ -158,11 +160,18 @@ void draw2dTriangle(AstroCanvas& canvas, Vec2i a, Vec2i b, Vec2i c, Color color)
 
 
 // 3D Rendering
-typedef Vec4f Triangle[3];
+struct VertexAttributes {
+    Vec4f pos;
+    Vec3f normal;
+    Vec2f uv;
+    // Add more attributes as needed
+};
+typedef VertexAttributes Triangle[3];
 struct Varyings {
     Vec4f pos; 
     Vec3f normal;
     Vec2f uv;
+    // Add more attributes as needed
 };
 struct IShader {
     using Ptr = std::shared_ptr<IShader>; 
@@ -171,7 +180,7 @@ struct IShader {
      * @param vert (4D vertex position)
      * @return std::pair<bool, Vec3f> 
      */
-    virtual bool vertex(const Vec4f& in_pos, Varyings& out_varying) const = 0;
+    virtual bool vertex(const VertexAttributes& in_vert, Varyings& out_varying) const = 0;
 
     /**
      * @brief Vertex shader (process a fragment)
@@ -194,8 +203,10 @@ struct BasicShader : public IShader {
     void updateMVP() {
         MVP = projectionMatrix * viewMatrix * modelMatrix;
     }
-    virtual bool vertex(const Vec4f& in_pos, Varyings& out_varying) const override{
-        out_varying.pos = MVP * in_pos;
+    virtual bool vertex(const VertexAttributes& in_vert, Varyings& out_varying) const override {
+        out_varying.pos = MVP * in_vert.pos;
+        out_varying.normal = in_vert.normal;
+        out_varying.uv = in_vert.uv;
         return true;
     }
 
@@ -204,8 +215,24 @@ struct BasicShader : public IShader {
         return true;
     }
 
-private:
+protected:
     Mat4f MVP = Mat4f::Identity();
+};
+
+struct PhongShader : public BasicShader {
+    Vec3f invLightDir = normalize(Vec3f(0.0f, 0.0f, 1.0f));
+    
+    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override {
+        Vec3f N = normalize(interpolated.normal);
+        float intensity = std::max(0.0f, dot(N, invLightDir));
+        out_color = Color(
+            static_cast<uint8_t>(color.x * intensity),
+            static_cast<uint8_t>(color.y * intensity),
+            static_cast<uint8_t>(color.z * intensity),
+            color.w
+        );
+        return true;
+    }
 };
 
 /**

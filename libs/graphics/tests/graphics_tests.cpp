@@ -143,10 +143,9 @@ TEST(wireframeDrawing){
 
     
     // Just a Viewport transform. The model is already in the NDC space
-    const std::function<Vec2i(Vec3f)> project = [](Vec3f P) {
+    const std::function<Vec2i(Vec4f)> project = [](Vec4f P) {
         int x = static_cast<int>((P.x + 1.0) * WIDTH / 2.0f);
         int y = static_cast<int>(-1.0f * (P.y + 1.0) * (HEIGHT / 2.0f) + HEIGHT );
-        
         return Vec2i(x, y);
     };
     
@@ -157,17 +156,16 @@ TEST(wireframeDrawing){
         clearCanvas(canvas, gray);
         
         // Render wireframe
-        for(const auto& idx: wf_obj.triangle_idxs) {
-            
+        for (size_t i = 0; i < wf_obj.indices.size(); i += 3) {
             // Get triangle vertices
-            const Vec3f v1 = wf_obj.points[idx.v1];
-            const Vec3f v2 = wf_obj.points[idx.v2];
-            const Vec3f v3 = wf_obj.points[idx.v3];
+            const Vec4f v0 = wf_obj.vertices[wf_obj.indices[i]].pos;
+            const Vec4f v1 = wf_obj.vertices[wf_obj.indices[i + 1]].pos;
+            const Vec4f v2 = wf_obj.vertices[wf_obj.indices[i + 2]].pos;
             
             // Project vertices to clip-space
-            Vec2i v1_proj = project(v1);
-            Vec2i v2_proj = project(v2);
-            Vec2i v3_proj = project(v3);
+            Vec2i v1_proj = project(v0);
+            Vec2i v2_proj = project(v1);
+            Vec2i v3_proj = project(v2);
             
             if(!isInCanvasBounds(canvas, v1_proj.x, v1_proj.y )) continue;
             if(!isInCanvasBounds(canvas, v2_proj.x, v2_proj.y )) continue;
@@ -179,8 +177,8 @@ TEST(wireframeDrawing){
         }
         
         // Render vertices
-        for(const auto P : wf_obj.points){
-            const Vec2i p = project(P);
+        for(const auto P : wf_obj.vertices){
+            const Vec2i p = project(P.pos);
             if(!isInCanvasBounds(canvas, p.x, p.y )) continue;
             putPixel(canvas, p.x, p.y, white);
         }
@@ -216,7 +214,8 @@ TEST(perspectiveCamera) {
     ASSERT_TRUE(std::filesystem::exists(wf_path));
     ASSERT_TRUE(std::filesystem::is_regular_file(wf_path));
     ASSERT_EQ(wf_path.extension(), ".obj");
-    astro::core::io::OBJFile wf_obj(wf_path);
+    astro::core::io::OBJFile wf_obj;
+    wf_obj.loadFromFile(wf_path);
 
     // Create Camera
     astro::core::camera::PerspectiveCamera camera(WIDTH, HEIGHT, 60.);
@@ -225,7 +224,8 @@ TEST(perspectiveCamera) {
     float orbitAlpha = 0.0;
     
     // Create shader
-    BasicShader shader;
+    // BasicShader shader;
+    PhongShader shader;
     shader.projectionMatrix = camera.getProjectionMatrix();
     shader.modelMatrix = Mat4f::Identity();
     
@@ -234,8 +234,8 @@ TEST(perspectiveCamera) {
     std::mt19937 rng(r_dev());
     std::uniform_int_distribution<uint8_t> dist(0, 255); // [0, 255] integer distribution
     std::vector<Color> colorList;
-    colorList.reserve(wf_obj.triangle_idxs.size());
-    for(int i = 0; i < wf_obj.triangle_idxs.size(); i++)
+    colorList.reserve(wf_obj.indices.size());
+    for(int i = 0; i < wf_obj.indices.size(); i++)
         colorList.emplace_back(dist(rng), dist(rng), dist(rng), 255);
     
     // Main loop
@@ -252,18 +252,18 @@ TEST(perspectiveCamera) {
         shader.viewMatrix = camera.getViewMatrix();
         shader.updateMVP();
 
-        // Render wireframe
-        for(int i = 0; i < wf_obj.triangle_idxs.size(); i++) {
-            
-            // Get triangle vertices
-            const auto& idx = wf_obj.triangle_idxs[i];
-            const Vec3f v1 = wf_obj.points[idx.v1];
-            const Vec3f v2 = wf_obj.points[idx.v2];
-            const Vec3f v3 = wf_obj.points[idx.v3];
+        // Render triangles
+        for (size_t i = 0; i < wf_obj.indices.size(); i += 3) {
+
+            // Get triangle data
+            const VertexAttributes& v0 = wf_obj.vertices[wf_obj.indices[i]];
+            const VertexAttributes& v1 = wf_obj.vertices[wf_obj.indices[i + 1]];
+            const VertexAttributes& v2 = wf_obj.vertices[wf_obj.indices[i + 2]];
+            Triangle triangle = {v0, v1, v2 };
             
             // Render triangle
             shader.color = colorList[i];
-            TDRenderer::renderTriangle(canvas, {Vec4f(v1.x, v1.y, v1.z, 1.0f), Vec4f(v2.x, v2.y, v2.z, 1.0f), Vec4f(v3.x, v3.y, v3.z, 1.0f)}, shader);
+            TDRenderer::renderTriangle(canvas, triangle, shader);
         }
         
         // Show on window
@@ -285,7 +285,7 @@ TEST(perspectiveCamera) {
 }
 
 int main(){
-    // return run_test("perspectiveCamera");
+    return run_test("perspectiveCamera");
 
     bool allSuccess = run_all_tests();
     return !allSuccess;

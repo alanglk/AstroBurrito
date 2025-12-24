@@ -24,7 +24,7 @@ struct Vector {
     static constexpr int rows = N;
     static constexpr int cols = 1;
 
-    T data[N];
+    T data[N] = {};
     Vector() = default; // No initialization
     constexpr Vector(const T& val){     // Scalar initialization
         std::fill(data, data+N, val);
@@ -117,6 +117,7 @@ template<typename T> struct Vector<T, 3> {
     };
     Vector() = default; // No initialization
     constexpr Vector(const T& val) : data(val, val, val) {} // Scalar fill
+    constexpr Vector(Vector<T, 2> vec, T z_val) : data{vec.x, vec.y, z_val} {} // From Vec2 + z
     constexpr Vector(const Vector<T, rows>& vec){ // Copy-Constructor
         for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
@@ -164,6 +165,8 @@ template<typename T> struct Vector<T, 4> {
     };
     Vector() = default; // No initialization
     constexpr Vector(const T& val) : data(val, val, val, val) {} // Scalar fill
+    constexpr Vector(Vector<T, 2> vec, T z_val, T w_val) : data{vec.x, vec.y, z_val, w_val} {} // From Vec2 + z + w
+    constexpr Vector(Vector<T, 3> vec, T w_val) : data{vec.x, vec.y, vec.z, w_val} {} // From Vec3 + w
     constexpr Vector(const Vector<T, rows>& vec){ // Copy-Constructor
         for (int i = 0; i < rows; i++) data[i] = vec[i];
     }
@@ -330,7 +333,7 @@ Vector<T, N> operator/(const Vector<T, N>& a, const Vector<T, N>& b) {
  */
 template<typename T, int N>
 T dot(const Vector<T, N>& a, const Vector<T, N>& b) {
-    T res; 
+    T res = static_cast<T>(0); // Initialize to 0
     for(int i = 0; i < N; i++) res += a.data[i] * b.data[i];
     return res; 
 }

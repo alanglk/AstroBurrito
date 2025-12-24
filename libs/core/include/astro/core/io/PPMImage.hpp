@@ -40,7 +40,7 @@ public:
         
         for (int j = 0; j < image.height; j++){
             for (int i = 0; i < image.width; i++){
-                Color &col = image.data[ASTRO_INDEX(i, j, image.width)];
+                Color col = getPixel(image, i, j);
                 fs << col.r << col.g << col.b;
             }
         }

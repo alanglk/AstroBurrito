@@ -12,7 +12,8 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "ASTRO_BUILD_TESTS": "OFF"
+                "ASTRO_BUILD_TESTS": "OFF",
+                "ASTRO_GRAPICS_PARALLEL": "OFF"
             }
         },
         {
@@ -22,8 +23,8 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CXXFLAGS": "pg",
-                "ASTRO_BUILD_TESTS": "ON"
+                "ASTRO_BUILD_TESTS": "ON",
+                "ASTRO_GRAPICS_PARALLEL": "OFF"
             }
         }
     ]
