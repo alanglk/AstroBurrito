@@ -49,8 +49,17 @@ function(astro_add_tests target)
     endif()
 endfunction()
 
-# Add subdirectories
+
+# Librraries
 add_subdirectory(libs/math)
 add_subdirectory(libs/graphics)
 add_subdirectory(libs/core)
+
+# Astro Engine
+add_subdirectory(extern/glad)
+add_subdirectory(extern/imgui)
+add_subdirectory(engine)
+
+# Game
 add_subdirectory(game)
+
