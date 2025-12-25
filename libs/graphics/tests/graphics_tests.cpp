@@ -316,6 +316,7 @@ TEST(textureModel) {
         
         // Update shader matrices
         shader.viewMatrix = camera.getViewMatrix();
+        shader.cameraPos = Vec3f(camX, 0.0, camZ);
         shader.updateMVP();
 
         // Render triangles

@@ -228,7 +228,7 @@ struct PhongShader : public BasicShader {
     std::shared_ptr<AstroCanvas> normalMap      = nullptr;
     
     // Lighting source
-    Vec3f invLightDir = normalize(Vec3f(1.0f, 1.0f, 1.0f)); 
+    Vec3f invLightDir = normalize(Vec3f(0.0f, 0.0f, 1.0f)); 
     Vec3f cameraPos   = Vec3f(0.0f, 0.0f, 3.0f);
     Vec3f lightColor = Vec3f(255.f, 255.f, 255.f);
     
@@ -305,7 +305,7 @@ struct PhongShader : public BasicShader {
 
         return true;
     }
-        
+
 };
 
 /**
