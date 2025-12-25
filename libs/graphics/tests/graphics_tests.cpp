@@ -1,11 +1,9 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <random>
 #include <string>
 #include <thread>
 #include <vector>
@@ -22,7 +20,13 @@ using namespace astro::math;
 #define COLOR_DEPTH 24
 #define MAX_TEST_DURATION 5 // seconds
 
-#define OBJ_DIABLO_PATH "/home/alanglk/AstroBurrito/assets/test/diablo3_pose.obj"
+#define PROJECT_PATH "/home/ag6154lk/AstroBurrito"
+// #define PROJECT_PATH "/home/alanglk/AstroBurrito"
+
+#define DIABLO_OBJ_PATH PROJECT_PATH "/assets/test/diablo3_pose.obj"
+#define DIABLO_DIFF_PATH PROJECT_PATH "/assets/test/diablo3_pose_diffuse.tga"
+#define DIABLO_SPEC_PATH PROJECT_PATH "/assets/test/diablo3_pose_spec.tga"
+#define DIABLO_NM_PATH PROJECT_PATH "/assets/test/diablo3_pose_nm.tga"
 
 // Define colors
 Color black (0, 0, 0); 
@@ -36,6 +40,7 @@ Color blue  (0, 0, 255);
 #include "astro/core/platform/IPlatformLayer.hpp"
 #include "astro/core/platform/PlatformFactory.hpp"
 #include "astro/core/io/PPMImage.hpp"
+#include "astro/core/io/TGAImage.hpp"
 #include "astro/core/io/OBJFile.hpp"
 #include "astro/core/camera/PerspectiveCamera.hpp"
 using namespace astro::core::platform;
@@ -47,14 +52,14 @@ public:
         console = PlatformFactory::getPlatform();
         const LayerConfig layerConfig = {
             window_name,
-            WIDTH,
-            HEIGHT,
+            width,
+            height,
             COLOR_DEPTH,
             LayerEventType::EvtNone
         };
         console->initialize(layerConfig);
     }
-    void showCanvas(AstroCanvas& canvas){
+    void showCanvas(const AstroCanvas& canvas){
         console->render(canvas);
     }
 private:
@@ -135,7 +140,7 @@ TEST(wireframeDrawing){
 
     
     // Parse .obj file into array of points
-    std::filesystem::path wf_path = OBJ_DIABLO_PATH;
+    std::filesystem::path wf_path = DIABLO_OBJ_PATH;
     ASSERT_TRUE(std::filesystem::exists(wf_path));
     ASSERT_TRUE(std::filesystem::is_regular_file(wf_path));
     ASSERT_EQ(wf_path.extension(), ".obj");
@@ -210,7 +215,7 @@ TEST(perspectiveCamera) {
     TestWindow window("perspectiveCamera", WIDTH, HEIGHT);
 
     // Parse .obj file into array of points
-    std::filesystem::path wf_path = OBJ_DIABLO_PATH;
+    std::filesystem::path wf_path = DIABLO_OBJ_PATH;
     ASSERT_TRUE(std::filesystem::exists(wf_path));
     ASSERT_TRUE(std::filesystem::is_regular_file(wf_path));
     ASSERT_EQ(wf_path.extension(), ".obj");
@@ -224,19 +229,9 @@ TEST(perspectiveCamera) {
     float orbitAlpha = 0.0;
     
     // Create shader
-    // BasicShader shader;
-    PhongShader shader;
+    BasicShader shader;
     shader.projectionMatrix = camera.getProjectionMatrix();
     shader.modelMatrix = Mat4f::Identity();
-    
-    // Random color generator
-    std::random_device r_dev;
-    std::mt19937 rng(r_dev());
-    std::uniform_int_distribution<uint8_t> dist(0, 255); // [0, 255] integer distribution
-    std::vector<Color> colorList;
-    colorList.reserve(wf_obj.indices.size());
-    for(int i = 0; i < wf_obj.indices.size(); i++)
-        colorList.emplace_back(dist(rng), dist(rng), dist(rng), 255);
     
     // Main loop
     int i = 0;
@@ -262,7 +257,6 @@ TEST(perspectiveCamera) {
             Triangle triangle = {v0, v1, v2 };
             
             // Render triangle
-            shader.color = colorList[i];
             TDRenderer::renderTriangle(canvas, triangle, shader);
         }
         
@@ -284,8 +278,80 @@ TEST(perspectiveCamera) {
     return true;
 }
 
+TEST(textureModel) {
+
+    // Create window
+    AstroCanvas canvas(WIDTH, HEIGHT);
+    TestWindow window("textureModel", WIDTH, HEIGHT);
+    
+    // Load assets
+    const auto diablo_diff = astro::core::io::TGAImage::readImage(DIABLO_DIFF_PATH);
+    const auto diablo_spec = astro::core::io::TGAImage::readImage(DIABLO_SPEC_PATH);
+    const auto diablo_nm = astro::core::io::TGAImage::readImage(DIABLO_NM_PATH);
+    const astro::core::io::OBJFile diablo_obj(DIABLO_OBJ_PATH);
+
+    // Create Camera
+    astro::core::camera::PerspectiveCamera camera(WIDTH, HEIGHT, 60.);
+    const float orbitRadius = 2.;
+    const float orbitDeltaAlpha = 0.05;
+    float orbitAlpha = 0.0;
+    
+    // Create shader
+    PhongShader shader;
+    shader.projectionMatrix = camera.getProjectionMatrix();
+    shader.modelMatrix = Mat4f::Identity();
+    shader.diffuseMap = std::make_shared<AstroCanvas>(diablo_diff);
+    shader.specularMap = std::make_shared<AstroCanvas>(diablo_spec);
+    shader.normalMap = std::make_shared<AstroCanvas>(diablo_nm);
+    
+    // Main loop
+    int i = 0;
+    const auto init_t = std::chrono::steady_clock::now();
+    while(true){
+        clearCanvas(canvas, gray);
+        float camX = orbitRadius*std::cos(orbitAlpha);
+        float camZ = orbitRadius*std::sin(orbitAlpha);
+        camera.lookAt({camX, 0., camZ}, {0., 0., 0.}, {0., 1., 0.});
+        orbitAlpha+=orbitDeltaAlpha;
+        
+        // Update shader matrices
+        shader.viewMatrix = camera.getViewMatrix();
+        shader.updateMVP();
+
+        // Render triangles
+        for (size_t i = 0; i < diablo_obj.indices.size(); i += 3) {
+
+            // Get triangle data
+            const VertexAttributes& v0 = diablo_obj.vertices[diablo_obj.indices[i]];
+            const VertexAttributes& v1 = diablo_obj.vertices[diablo_obj.indices[i + 1]];
+            const VertexAttributes& v2 = diablo_obj.vertices[diablo_obj.indices[i + 2]];
+            Triangle triangle = {v0, v1, v2 };
+            
+            // Render triangle
+            TDRenderer::renderTriangle(canvas, triangle, shader);
+        }
+        
+        // Show on window
+        window.showCanvas(canvas);
+
+        // Check for ellapsed time
+        const auto now = std::chrono::steady_clock::now();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - init_t).count();
+        if (elapsed >= MAX_TEST_DURATION) break;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        i++;
+    }
+    
+    astro::core::io::PPMImage::writeImage("./graphics_camera_test.ppm", canvas);
+    AstroCanvas zBufferImage = canvas.zbuffer2Image();
+    astro::core::io::PPMImage::writeImage("./graphics_camera_depth_test.ppm", zBufferImage);
+    return true;
+}
+
+
 int main(){
-    return run_test("perspectiveCamera");
+    return run_test("textureModel");
 
     bool allSuccess = run_all_tests();
     return !allSuccess;

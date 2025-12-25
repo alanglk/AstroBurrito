@@ -22,7 +22,7 @@ public:
 
     void initialize(const LayerConfig &layerConfig) override;
     void processEvents(LayerEvent& layerEvent) override;
-    void render(graphics::AstroCanvas& canvas) override;
+    void render(const graphics::AstroCanvas& canvas) override;
     void close() override;
 
 private:

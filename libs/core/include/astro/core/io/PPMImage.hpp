@@ -8,15 +8,13 @@
 
 #include "astro/graphics/graphics.hpp"
 
-using namespace astro::graphics;
-
 namespace astro {
 namespace core {
 namespace io {
-    
+
 class PPMImage {
 public:
-    static inline void writeImage(const std::string& path, AstroCanvas& image){
+    static inline void writeImage(const std::string& path, const graphics::AstroCanvas& image){
         std::filesystem::path out_path = path;
         
         if (out_path.extension().compare(".ppm") != 0) {
@@ -40,7 +38,7 @@ public:
         
         for (int j = 0; j < image.height; j++){
             for (int i = 0; i < image.width; i++){
-                Color col = getPixel(image, i, j);
+                graphics::Color col = getPixel(image, i, j);
                 fs << col.r << col.g << col.b;
             }
         }
