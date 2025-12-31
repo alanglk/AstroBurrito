@@ -108,79 +108,71 @@ void draw2dTriangle(AstroCanvas& canvas, Vec2i a, Vec2i b, Vec2i c, Color color)
 
 
 // 3D Rendering
-Varyings interpolateVaryings(const std::array<Varyings, 3>& varyings, const Vec3f& bary) {
-    Varyings result{};
+Varyings interpolateVaryings(const std::array<Varyings, 3>& v, const Vec3f& bary, 
+                             float iw0, float iw1, float iw2) {
+    Varyings res = {};
+    // Calculate the interpolated 1/W for this specific pixel
+    float inter_iw = iw0 * bary.x + iw1 * bary.y + iw2 * bary.z;
+    float w = 1.0f / inter_iw;
+
+    // Attribute interpolation: (A0/w0 * alpha + A1/w1 * beta + A2/w2 * gamma) * w
+    auto interp = [&](auto a, auto b, auto c) {
+        return (a * iw0 * bary.x + b * iw1 * bary.y + c * iw2 * bary.z) * w;
+    };
+
+    res.uv       = interp(v[0].uv, v[1].uv, v[2].uv);
+    res.normal   = interp(v[0].normal, v[1].normal, v[2].normal);
+    res.tangent  = interp(v[0].tangent, v[1].tangent, v[2].tangent);
+    res.worldPos = interp(v[0].worldPos, v[1].worldPos, v[2].worldPos);
     
-    // Linear position interpolation (innacurate for large triangles)
-    result.pos      = varyings[0].pos * bary.x + varyings[1].pos * bary.y + varyings[2].pos * bary.z;
-
-    // Linear normal interpolation (Flat Shading)
-    /*
-    const Vec3f A = {varyings[0].pos.x, varyings[0].pos.y, varyings[0].pos.z};
-    const Vec3f B = {varyings[1].pos.x, varyings[1].pos.y, varyings[1].pos.z};
-    const Vec3f C = {varyings[2].pos.x, varyings[2].pos.y, varyings[2].pos.z};
-    const Vec3f edgeAB = B - A;
-    const Vec3f edgeAC = C - A;
-    result.normal = normalize(cross(edgeAB, edgeAC));
-    */
-
-    // Linear normal interpolation (Smooth Shading)
-    result.normal   = varyings[0].normal * bary.x + varyings[1].normal * bary.y + varyings[2].normal * bary.z;
-
-    // Linear UV interpolation
-    result.uv       = varyings[0].uv * bary.x + varyings[1].uv * bary.y + varyings[2].uv * bary.z;
-
-    return result;
+    return res;
 }
 void TDRenderer::renderTriangle(AstroCanvas& canvas, const Triangle& triangle, const IShader& shader) {
     std::array<Varyings, 3> varyings{};
     std::array<Vec3f, 3> screen_pts{};
+    std::array<float, 3> inv_w{};
 
-    // Vertex Processing
+    // Vertex Shader
     for (int i = 0; i < 3; ++i) {
-        if (!shader.vertex(triangle[i], varyings[i])) return; // Simple Culling
+        if (!shader.vertex(triangle[i], varyings[i])) return;
 
-        // Perspective Division & Viewport Transform
-        float inv_w = 1.0f / varyings[i].pos.w;
+        inv_w[i] = 1.0f / varyings[i].pos.w;
         screen_pts[i] = {
-            (varyings[i].pos.x * inv_w + 1.0f) * 0.5f * canvas.width,
-            (1.0f - varyings[i].pos.y * inv_w) * 0.5f * canvas.height,
-            varyings[i].pos.z * inv_w
+            (varyings[i].pos.x * inv_w[i] + 1.0f) * 0.5f * (float)canvas.width,
+            (1.0f - varyings[i].pos.y * inv_w[i]) * 0.5f * (float)canvas.height,
+            varyings[i].pos.z * inv_w[i] 
         };
     }
-    
 
     // Backface Culling
     double total_area = signed_triangle_area(screen_pts[0].x, screen_pts[0].y, 
-                        screen_pts[1].x, screen_pts[1].y, 
-                        screen_pts[2].x, screen_pts[2].y);
-    // if (std::abs(total_area) < 0.0001) return; // Disable culling
-    // if (total_area < 0.0001) return; // Clockwise
-    if (total_area > -0.0001) return;   // Counter Clockwise
+                                           screen_pts[1].x, screen_pts[1].y, 
+                                           screen_pts[2].x, screen_pts[2].y);
+    if (total_area > -0.0001) return; 
 
-    // Rasterization
+    // Rasterization Setup
     int bbminx = std::max(0, (int)std::floor(std::min({screen_pts[0].x, screen_pts[1].x, screen_pts[2].x})));
     int bbminy = std::max(0, (int)std::floor(std::min({screen_pts[0].y, screen_pts[1].y, screen_pts[2].y})));
     int bbmaxx = std::min(canvas.width - 1, (int)std::ceil(std::max({screen_pts[0].x, screen_pts[1].x, screen_pts[2].x})));
     int bbmaxy = std::min(canvas.height - 1, (int)std::ceil(std::max({screen_pts[0].y, screen_pts[1].y, screen_pts[2].y})));
-    float inv_total_area = 1.0f / total_area;
+    float inv_total_area = 1.0f / (float)total_area;
 
     #pragma omp parallel for
     for (int y = bbminy; y <= bbmaxy; ++y) {
         for (int x = bbminx; x <= bbmaxx; ++x) {
-            // Calculate barycentric 
             float alpha = signed_triangle_area(x, y, screen_pts[1].x, screen_pts[1].y, screen_pts[2].x, screen_pts[2].y) * inv_total_area;
             float beta  = signed_triangle_area(x, y, screen_pts[2].x, screen_pts[2].y, screen_pts[0].x, screen_pts[0].y) * inv_total_area;
             float gamma = 1.0f - alpha - beta;
+
             if (alpha < 0 || beta < 0 || gamma < 0) continue;
 
-            // Z-Buffer check
+            // Z-Buffer check (using interpolated screen-space depth)
             double depth = alpha * screen_pts[0].z + beta * screen_pts[1].z + gamma * screen_pts[2].z;
             if (depth >= getDepth(canvas, x, y)) continue;
 
-            // Fragment shader
+            // Fragment Shader
             Color fragColor;
-            Varyings interpolated = interpolateVaryings(varyings, {alpha, beta, gamma});
+            Varyings interpolated = interpolateVaryings(varyings, {alpha, beta, gamma}, inv_w[0], inv_w[1], inv_w[2]);
             if (shader.fragment(interpolated, fragColor)) {
                 putDepth(canvas, x, y, depth);
                 putPixel(canvas, x, y, fragColor);

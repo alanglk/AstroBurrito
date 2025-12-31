@@ -18,9 +18,16 @@ public:
     // Getters
     const math::Mat4f& getViewMatrix() { return ViewMatrix; }
     const math::Mat4f& getProjectionMatrix() { return ProjectionMatrix; }
+    const math::Vec3f& getEye() { return m_eye; }
+    const math::Vec3f& getTarget() { return m_target; }
+    const math::Vec3f& getUp() { return m_up; }
     
     // Functions
     void lookAt(const math::Vec3f& eye, const math::Vec3f& target, const math::Vec3f& up) {
+        m_eye = eye;
+        m_target = target;
+        m_up = up;
+
         math::Vec3f zaxis = math::normalize(eye - target); // Forward
         math::Vec3f xaxis = math::normalize(math::cross(up, zaxis)); // Right
         math::Vec3f yaxis = math::cross(zaxis, xaxis); // Up
@@ -38,6 +45,11 @@ private:
     float znear;
     float zfar;
     float fov_deg;
+    
+    math::Vec3f m_eye;
+    math::Vec3f m_target;
+    math::Vec3f m_up;
+
     
     math::Mat4f ViewMatrix = math::Mat4f::Identity();
     math::Mat4f ProjectionMatrix = math::Mat4f::Identity();

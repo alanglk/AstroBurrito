@@ -85,6 +85,56 @@ public:
             }
         }
         
+        // Compute Tangent vectors
+        for (size_t i = 0; i < indices.size(); i += 3) {
+            uint32_t i0 = indices[i];
+            uint32_t i1 = indices[i + 1];
+            uint32_t i2 = indices[i + 2];
+
+            graphics::VertexAttributes& v0 = vertices[i0];
+            graphics::VertexAttributes& v1 = vertices[i1];
+            graphics::VertexAttributes& v2 = vertices[i2];
+
+            math::Vec3f edge1 = (v1.pos - v0.pos).xyz;
+            math::Vec3f edge2 = (v2.pos - v0.pos).xyz;
+
+            math::Vec2f deltaUV1 = v1.uv - v0.uv;
+            math::Vec2f deltaUV2 = v2.uv - v0.uv;
+
+            float det = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+            math::Vec3f tangent;
+
+            if (std::abs(det) < 1e-6f) {
+                // Degenerate UVs, use a default tangent based on the first edge
+                tangent = math::normalize(edge1);
+            } else {
+                float f = 1.0f / det;
+                tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+                tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+                tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+                tangent = math::normalize(tangent);
+            }
+
+            // Accumulate into all three vertices of the triangle (for smoothing)
+            v0.tangent = v0.tangent + tangent;
+            v1.tangent = v1.tangent + tangent;
+            v2.tangent = v2.tangent + tangent;
+        }
+
+        // Re-normalize and Orthonormalize (Gram-Schmidt)
+        for (auto& v : vertices) {
+            if (math::len(v.tangent) > 0.0001f) {
+                v.tangent = math::normalize(v.tangent);
+                
+                // Gram-Schmidt: Ensure tangent is perfectly orthogonal to the normal
+                // T = normalize(T - N * dot(N, T))
+                v.tangent = math::normalize(v.tangent - v.normal * math::dot(v.normal, v.tangent));
+            } else {
+                // Fallback if tangent is zero (e.g. no UVs provided)
+                v.tangent = math::Vec3f(1, 0, 0); 
+            }
+        }
+        
         // Final Safety Check 2: Index buffer length
         if (indices.size() % 3 != 0) {
             // This should be logically impossible with the Fan Triangulation 

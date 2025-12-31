@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <sys/ucontext.h>
 #include <thread>
 #include <vector>
 
@@ -18,15 +19,17 @@ using namespace astro::math;
 #define WIDTH 800
 #define HEIGHT 600
 #define COLOR_DEPTH 24
-#define MAX_TEST_DURATION 5 // seconds
+#define MAX_TEST_DURATION 20 // seconds
 
-#define PROJECT_PATH "/home/ag6154lk/AstroBurrito"
-// #define PROJECT_PATH "/home/alanglk/AstroBurrito"
+// #define PROJECT_PATH "/home/ag6154lk/AstroBurrito"
+#define PROJECT_PATH "/home/alanglk/AstroBurrito"
 
 #define DIABLO_OBJ_PATH PROJECT_PATH "/assets/test/diablo3_pose.obj"
 #define DIABLO_DIFF_PATH PROJECT_PATH "/assets/test/diablo3_pose_diffuse.tga"
 #define DIABLO_SPEC_PATH PROJECT_PATH "/assets/test/diablo3_pose_spec.tga"
 #define DIABLO_NM_PATH PROJECT_PATH "/assets/test/diablo3_pose_nm.tga"
+#define DIABLO_NM_TAN_PATH PROJECT_PATH "/assets/test/diablo3_pose_nm_tangent.tga"
+#define DIABLO_GLOW_PATH PROJECT_PATH "/assets/test/diablo3_pose_glow.tga"
 
 // Define colors
 Color black (0, 0, 0); 
@@ -287,36 +290,65 @@ TEST(textureModel) {
     // Load assets
     const auto diablo_diff = astro::core::io::TGAImage::readImage(DIABLO_DIFF_PATH);
     const auto diablo_spec = astro::core::io::TGAImage::readImage(DIABLO_SPEC_PATH);
-    const auto diablo_nm = astro::core::io::TGAImage::readImage(DIABLO_NM_PATH);
+    const auto diablo_nm_tangent = astro::core::io::TGAImage::readImage(DIABLO_NM_TAN_PATH);
+    const auto diablo_glow = astro::core::io::TGAImage::readImage(DIABLO_GLOW_PATH);
     const astro::core::io::OBJFile diablo_obj(DIABLO_OBJ_PATH);
 
     // Create Camera
     astro::core::camera::PerspectiveCamera camera(WIDTH, HEIGHT, 60.);
-    const float orbitRadius = 2.;
-    const float orbitDeltaAlpha = 0.05;
+    camera.lookAt({0.0, 0., 2.0}, {0., 0., 0.}, {0., 1., 0.});
+    
+    // Orbit variables
+    const float orbitRadius = 3.5f;
+    const float orbitDeltaAlpha = 0.1;
     float orbitAlpha = 0.0;
     
-    // Create shader
+    // Create Material, Lightings and Shader
+    Material mat;
+    mat.color           = Vec4f(red.r, red.g, red.b, 255.0f) / 255.0f;
+    mat.shininess       = 32.0f;
+    mat.diffuseCoeff    = 1.0f;
+    mat.specularCoeff   = 5.0f;
+    mat.oppacity        = 1.0f;
+    mat.colorTexture    = std::make_shared<AstroCanvas>(diablo_diff);
+    mat.specularMap     = std::make_shared<AstroCanvas>(diablo_spec);
+    mat.normalMap       = std::make_shared<AstroCanvas>(diablo_nm_tangent);
+    mat.glowMap         = std::make_shared<AstroCanvas>(diablo_glow);
+    
+    Light torch;
+    torch.type = Light::POINT;
+    torch.worldPos = Vec3f(5.0f, 2.0f, 5.0f); 
+    torch.color = Vec4f(1.0f, 0.7f, 0.3f, 1.0f); // Warm orange tint
+    torch.intensity = 12.0f; // Brightness
+    torch.range = 10.0f;     // Visible up to 10 meters away
+    
+    Light sun;
+    sun.type = Light::DIRECTIONAL;
+    sun.worldDir = Vec3f(0.0f, -1.0f, -0.5f);
+    sun.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
+    sun.intensity = 2.5f;
+    
     PhongShader shader;
     shader.projectionMatrix = camera.getProjectionMatrix();
     shader.modelMatrix = Mat4f::Identity();
-    shader.diffuseMap = std::make_shared<AstroCanvas>(diablo_diff);
-    shader.specularMap = std::make_shared<AstroCanvas>(diablo_spec);
-    shader.normalMap = std::make_shared<AstroCanvas>(diablo_nm);
+    shader.material = std::make_shared<Material>(mat);
+    shader.sceneLights.push_back(torch);
+
     
     // Main loop
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
     while(true){
         clearCanvas(canvas, gray);
-        float camX = orbitRadius*std::cos(orbitAlpha);
-        float camZ = orbitRadius*std::sin(orbitAlpha);
-        camera.lookAt({camX, 0., camZ}, {0., 0., 0.}, {0., 1., 0.});
+        float orbitX = orbitRadius*std::cos(orbitAlpha);
+        float orbitY = orbitRadius*std::sin(orbitAlpha);
         orbitAlpha+=orbitDeltaAlpha;
+        // camera.lookAt({orbitX, 0., orbitY}, {0., 0., 0.}, {0., 1., 0.});
         
         // Update shader matrices
         shader.viewMatrix = camera.getViewMatrix();
-        shader.cameraPos = Vec3f(camX, 0.0, camZ);
+        shader.sceneLights[0].worldPos = Vec3f(orbitX, 0.0, orbitY);
+        shader.cameraPos = camera.getEye();
         shader.updateMVP();
 
         // Render triangles
