@@ -221,7 +221,6 @@ struct VertexAttributes {
     Vec4f pos;
     Vec3f normal;
     Vec3f tangent = Vec3f(0.0f);
-    // Add more attributes as needed
 };
 typedef VertexAttributes Triangle[3];
 
@@ -231,7 +230,6 @@ struct Varyings {
     Vec4f worldPos; // World positionn
     Vec3f normal;
     Vec3f tangent;
-    // Add more attributes as needed
 };
 
 // Lighting

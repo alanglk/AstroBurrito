@@ -26,36 +26,42 @@ void putPixel(Texture& texture, int x, int y, Color &color){
 const Color& getPixel(const Texture& texture, int x, int y) {
     return texture.data[texture.index(x, y)];
 }
+
+// Faster than std::floor
+float fast_wrap(float val) { return val - static_cast<int>(val) + (val < 0); }
 Color sampleTextureColor(const Texture& texture, Vec2f uv) {
     // Wrap UVs to 0.0 - 1.0
-    float u = uv.x - std::floor(uv.x);
-    float v = uv.y - std::floor(uv.y);
-    
-    // Flip V (Texture coordinates usually start top-left, UVs bottom-left)
-    v = 1.0f - v; 
+    float u = fast_wrap(uv.x);
+    float v = 1.0f - fast_wrap(uv.y); // Flip V (Texture coordinates usually start top-left, UVs bottom-left)
 
     // Map to pixel dimensions
     int tx = static_cast<int>(u * texture.width);
     int ty = static_cast<int>(v * texture.height);
 
-    // Clamp safety
-    tx = std::max(0, std::min(tx, texture.width - 1));
-    ty = std::max(0, std::min(ty, texture.height - 1));
-    return getPixel(texture, tx, ty);
+    // Safety clamp (can be removed if the texture is power of two)
+    tx = (tx < 0) ? 0 : (tx >= texture.width)  ? texture.width - 1  : tx;
+    ty = (ty < 0) ? 0 : (ty >= texture.height) ? texture.height - 1 : ty;
+    return texture.data[ty * texture.width + tx]; // same as getPixel()
 }
 Vec4f sampleTexureColorAsVec4f(const Texture& texture, Vec2f uv) {
-    Color col = sampleTextureColor(texture, uv);
-    return Vec4f(col.r, col.g, col.b, col.a) / 255.0f;
+    return Vec4f(sampleTexureColorAsVec3f(texture, uv), 0.0f);
 }
 Vec3f sampleTexureColorAsVec3f(const Texture& texture, Vec2f uv) {
-    return sampleTexureColorAsVec4f(texture, uv).xyz;
+    static constexpr float inv255 = 1.0f / 255.0f;
+    Color col = sampleTextureColor(texture, uv);
+    return Vec3f(col[0] * inv255, col[1] * inv255, col[2] * inv255);
 }
 Vec4f sampleTexureVectorAsVec4f(const Texture& texture, Vec2f uv) {
-    Vec4f col = sampleTexureColorAsVec4f(texture, uv);
-    return (col /255.0f) * 2.0f - Vec4f(1.0f);
+    return Vec4f(sampleTexureColorAsVec3f(texture, uv), 0.0f);
 }
 Vec3f sampleTexureVectorAsVec3f(const Texture& texture, Vec2f uv) {
-    return sampleTexureColorAsVec4f(texture, uv).xyz;
+    static constexpr float inv255_times_two = 2.0f / 255.0f;
+    Color col = sampleTextureColor(texture, uv);
+    return Vec3f(
+        col[0] * inv255_times_two - 1.0f,
+        col[1] * inv255_times_two - 1.0f,
+        col[2] * inv255_times_two - 1.0f
+    );
 }
 
 
@@ -218,67 +224,79 @@ Vec4f PhongShader::calculatePhong(const Light& light, const Vec3f& normal, const
     return (diffusePart + specularPart) * attenuation;
 }
 bool PhongShader::fragment(const Varyings& interpolated, Color& out_color) const {
-    Vec3f N = normalize(interpolated.normal);
-
-
+    Vec3f worldPos = interpolated.worldPos.xyz;
+    Vec3f V = normalize(cameraPos - worldPos);
+    
     // Normal Mapping
-    Vec3f finalNormal = N; 
+    Vec3f finalNormal = normalize(interpolated.normal); 
     if (material->normalMap) {
         Vec3f T = normalize(interpolated.tangent);
-        // T = normalize(T - N * dot(T, N)); // Gram-Schmidt
-        Vec3f B = cross(N, T); // Bitangent
+        // Gram-Schmidt is usually done at load time now, but T = normalize(T - N * dot(T, N)) 
+        // if you need it here.
+        Vec3f B = cross(finalNormal, T);
         Vec3f mappedNormal = sampleTexureVectorAsVec3f(*material->normalMap, interpolated.uv);
-
-        // Transform normal from Tangent Space to World Space
-        // Matrix3x3(T, B, N) * mappedNormal
-        finalNormal = normalize(T * mappedNormal.x + B * mappedNormal.y + N * mappedNormal.z);
+        finalNormal = normalize(T * mappedNormal.x + B * mappedNormal.y + finalNormal * mappedNormal.z);
     }
 
-    // Texture Color
-    Vec4f texColor = (material->colorTexture) ? sampleTexureColorAsVec4f(*material->colorTexture, interpolated.uv) : material->color;
-    
-    // Specular Mask
-    Vec4f specMask = (material->specularMap) ? sampleTexureColorAsVec4f(*material->specularMap, interpolated.uv) : Vec4f(1.0f);
-
-    // Emmisive Materials (fake glowing)
-    Vec4f emissive = (material->glowMap) ? sampleTexureColorAsVec4f(*material->glowMap, interpolated.uv) : Vec4f(0.0f);
+    // Texture samplers (avoid Vec4f at sampling if alpha is not needed)
+    Vec3f texColor = (material->colorTexture) ? sampleTexureColorAsVec3f(*material->colorTexture, interpolated.uv) : material->color.xyz;
+    float specMask = (material->specularMap) ? sampleTexureColorAsVec3f(*material->specularMap, interpolated.uv).x : 1.0f;
+    Vec3f emissive = (material->glowMap) ? sampleTexureColorAsVec3f(*material->glowMap, interpolated.uv) : Vec3f(0.0f);
 
     // Compute accumulated light
-    Vec4f accumulatedLight(0.0f);
+    Vec3f accumulatedLight(0.0f);
     for(const Light& light : sceneLights) {
-        accumulatedLight = accumulatedLight + calculatePhong(light, finalNormal, interpolated.worldPos.xyz, cameraPos, specMask);
+        Vec3f L;
+        float attenuation = light.intensity;
+
+        if (light.type == Light::POINT) {
+            L = light.worldPos - worldPos;
+            float distSq = dot(L, L); // Use squared length to avoid sqrt if possible
+            if (distSq > (light.range * light.range)) continue;
+            float dist = std::sqrt(distSq);
+            attenuation /= (1.0f + distSq); 
+            L = L / dist; // faster than normalize(L)
+        } else {
+            L = normalize(light.worldDir * -1.0f);
+        }
+
+        // Diffuse
+        float nDotL = dot(finalNormal, L);
+        if (nDotL <= 0.0f) continue; // light is behind surface
+
+        accumulatedLight = accumulatedLight + light.color.xyz * (nDotL * material->diffuseCoeff * attenuation);
+
+        // Specular (Blinn-Phong)
+        Vec3f H = normalize(L + V); // Halfway vector
+        float nDotH = std::max(0.0f, dot(finalNormal, H));
+        
+        // Fast Power approximation (or use a smaller lookup table)
+        float spec = std::pow(nDotH, material->shininess); 
+        accumulatedLight = accumulatedLight + light.color.xyz * (spec * material->specularCoeff * specMask * attenuation);
     }
     
-    // Combine and create final fragment color
-    Vec4f combined = (texColor * accumulatedLight) + emissive;
+    // Final composite (Doing math in float, then converting to uint8 at the very end)
+    Vec3f combined = (texColor * accumulatedLight) + emissive;
+    
     out_color = Color(
-        static_cast<uint8_t>(std::clamp(combined.x * 255.0f, 0.0f, 255.0f)),
-        static_cast<uint8_t>(std::clamp(combined.y * 255.0f, 0.0f, 255.0f)),
-        static_cast<uint8_t>(std::clamp(combined.z * 255.0f, 0.0f, 255.0f)),
-        static_cast<uint8_t>(std::clamp(combined.w * material->oppacity * 255.0f, 0.0f, 255.0f))
+        (uint8_t)(std::min(combined.x, 1.0f) * 255.0f),
+        (uint8_t)(std::min(combined.y, 1.0f) * 255.0f),
+        (uint8_t)(std::min(combined.z, 1.0f) * 255.0f),
+        (uint8_t)(material->oppacity * 255.0f)
     );
     return true;
 }
 
 // Renderer
-Varyings interpolateVaryings(const std::array<Varyings, 3>& v, const Vec3f& bary, float iw0, float iw1, float iw2) {
-    Varyings res = {};
-    // Calculate the interpolated 1/W for this specific pixel
-    float inter_iw = iw0 * bary.x + iw1 * bary.y + iw2 * bary.z;
-    float w = 1.0f / inter_iw;
-
-    // Attribute interpolation: (A0/w0 * alpha + A1/w1 * beta + A2/w2 * gamma) * w
-    auto interp = [&](auto a, auto b, auto c) {
-        return (a * iw0 * bary.x + b * iw1 * bary.y + c * iw2 * bary.z) * w;
-    };
-
-    res.uv       = interp(v[0].uv, v[1].uv, v[2].uv);
-    res.normal   = interp(v[0].normal, v[1].normal, v[2].normal);
-    res.tangent  = interp(v[0].tangent, v[1].tangent, v[2].tangent);
-    res.worldPos = interp(v[0].worldPos, v[1].worldPos, v[2].worldPos);
-    
-    return res;
-}
+/**
+ * @brief Inverse multiplied components for fast computation
+ */
+struct PreppedVarying {
+    Vec2f uvw;
+    Vec3f normalw;
+    Vec3f tangentw;
+    Vec3f worldPosw;
+};
 
 void TDRenderer::renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triangle& triangle, const IShader& shader) {
     std::array<Varyings, 3> varyings{};
@@ -288,6 +306,8 @@ void TDRenderer::renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triang
     // Vertex Shader
     for (int i = 0; i < 3; ++i) {
         if (!shader.vertex(triangle[i], varyings[i])) return;
+        if (varyings[i].pos.w < 0.1f) return;
+
 
         inv_w[i] = 1.0f / varyings[i].pos.w;
         screen_pts[i] = {
@@ -295,6 +315,15 @@ void TDRenderer::renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triang
             (1.0f - varyings[i].pos.y * inv_w[i]) * 0.5f * (float)texture.height,
             varyings[i].pos.z * inv_w[i] 
         };
+    }
+
+    // Pre-multiplied attibutes
+    std::array<PreppedVarying, 3> pv;
+    for (int i = 0; i < 3; ++i) {
+        pv[i].uvw = varyings[i].uv * inv_w[i];
+        pv[i].normalw = varyings[i].normal * inv_w[i];
+        pv[i].tangentw = varyings[i].tangent * inv_w[i];
+        pv[i].worldPosw = varyings[i].worldPos.xyz * inv_w[i];
     }
 
     // Backface Culling
@@ -310,7 +339,7 @@ void TDRenderer::renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triang
     int bbmaxy = std::min(texture.height - 1, (int)std::ceil(std::max({screen_pts[0].y, screen_pts[1].y, screen_pts[2].y})));
     float inv_total_area = 1.0f / (float)total_area;
 
-    #pragma omp parallel for
+    // Rasterization loop
     for (int y = bbminy; y <= bbmaxy; ++y) {
         for (int x = bbminx; x <= bbmaxx; ++x) {
             float alpha = signed_triangle_area(x, y, screen_pts[1].x, screen_pts[1].y, screen_pts[2].x, screen_pts[2].y) * inv_total_area;
@@ -319,14 +348,23 @@ void TDRenderer::renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triang
 
             if (alpha < 0 || beta < 0 || gamma < 0) continue;
 
-            // Z-Buffer check (using interpolated screen-space depth)
-            double depth = alpha * screen_pts[0].z + beta * screen_pts[1].z + gamma * screen_pts[2].z;
+            float depth = alpha * screen_pts[0].z + beta * screen_pts[1].z + gamma * screen_pts[2].z;
             if (depth >= getDepth(zbuffer, x, y)) continue;
 
-            // Fragment Shader
+            // 3. Perspective Reconstruction
+            // First, interpolate the reciprocal w
+            float interpolated_inv_w = alpha * inv_w[0] + beta * inv_w[1] + gamma * inv_w[2];
+            float w = 1.0f / interpolated_inv_w; // The only division needed!
+
+            // Linearly interpolate the pre-multiplied values and multiply by w to recover
+            Varyings interp;
+            interp.uv       = (pv[0].uvw * alpha + pv[1].uvw * beta + pv[2].uvw * gamma) * w;
+            interp.normal   = (pv[0].normalw * alpha + pv[1].normalw * beta + pv[2].normalw * gamma) * w;
+            interp.tangent  = (pv[0].tangentw * alpha + pv[1].tangentw * beta + pv[2].tangentw * gamma) * w;
+            interp.worldPos = Vec4f((pv[0].worldPosw * alpha + pv[1].worldPosw * beta + pv[2].worldPosw * gamma) * w, 1.0f);
+
             Color fragColor;
-            Varyings interpolated = interpolateVaryings(varyings, {alpha, beta, gamma}, inv_w[0], inv_w[1], inv_w[2]);
-            if (shader.fragment(interpolated, fragColor)) {
+            if (shader.fragment(interp, fragColor)) {
                 putDepth(zbuffer, x, y, depth);
                 putPixel(texture, x, y, fragColor);
             }

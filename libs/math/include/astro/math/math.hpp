@@ -536,10 +536,14 @@ operator*(const MatA& A, const MatB& B) {
     using T = typename MatA::value_type;
     Matrix<T, MatA::rows, MatB::cols> res(static_cast<T>(0));
 
-    for (int i = 0; i < MatA::rows; ++i)
-        for (int j = 0; j < MatB::cols; ++j)
-            for (int k = 0; k < MatA::cols; ++k)
-                res(i, j) += A(i, k) * B(k, j);
+    for (int i = 0; i < MatA::rows; ++i) {
+        for (int k = 0; k < MatA::cols; ++k) {
+            T temp = A(i, k); // Cache the value from A
+            for (int j = 0; j < MatB::cols; ++j) {
+                res(i, j) += temp * B(k, j); // Now both res and B are accessed linearly!
+            }
+        }
+    }
     return res;
 }
 
@@ -563,6 +567,16 @@ Vector<T, MatB::cols> operator*(const Vector<T, N>& v, const MatB& B) {
     for (int j = 0; j < MatB::cols; ++j)
         for (int k = 0; k < MatB::rows; ++k)
             res[j] += v[k] * B(k, j);
+    return res;
+}
+template <typename T, int N, MatrixLike MatB>
+requires (MatB::cols == 4 && MatB::rows == 4)
+Vector<T, 4> operator*(const Vector<T, 4>& v, const MatB& B) {
+    Vector<T, 4> res;
+    res =  B.getRow(0) * v[0];
+    res += B.getRow(1) * v[1];
+    res += B.getRow(2) * v[2];
+    res += B.getRow(3) * v[3];
     return res;
 }
 
@@ -656,81 +670,13 @@ Mat inverse(const Mat& A) {
         for (int c = 0; c < Mat::cols; ++c) {
             // The adjugate is the TRANSPOSE of the cofactor matrix
             T sign = ((r + c) % 2 == 0) ? 1 : -1;
-            res(c, r) = (sign * get_minor(A, r, c)) / det;
+            res(c, r) = (sign * minor(A, r, c)) / det;
         }
     }
     return res;
 }
 
 
-// Matrix specializations
-template <>
-inline Mat3f inverse(const Mat3f& m) {
-    float det = determinant(m);
-
-    // This is a naive check. Singular matrices should be handled in a better way
-    if (std::abs(det) < 1e-9) throw std::runtime_error("Matrix is singular");
-    float invDet = 1.0f / det;
-
-    Mat3f res(0.0f);
-    res(0, 0) = (m(1, 1) * m(2, 2) - m(1, 2) * m(2, 1)) * invDet;
-    res(0, 1) = (m(0, 2) * m(2, 1) - m(0, 1) * m(2, 2)) * invDet;
-    res(0, 2) = (m(0, 1) * m(1, 2) - m(0, 2) * m(1, 1)) * invDet;
-    res(1, 0) = (m(1, 2) * m(2, 0) - m(1, 0) * m(2, 2)) * invDet;
-    res(1, 1) = (m(0, 0) * m(2, 2) - m(0, 2) * m(2, 0)) * invDet;
-    res(1, 2) = (m(1, 0) * m(0, 2) - m(0, 0) * m(1, 2)) * invDet;
-    res(2, 0) = (m(1, 0) * m(2, 1) - m(1, 1) * m(2, 0)) * invDet;
-    res(2, 1) = (m(2, 0) * m(0, 1) - m(0, 0) * m(2, 1)) * invDet;
-    res(2, 2) = (m(0, 0) * m(1, 1) - m(1, 0) * m(0, 1)) * invDet;
-    return res;
-}
-template <>
-inline Mat4f inverse(const Mat4f& m) {
-    // Determinant 4x4 using 2x2 sub-determinants (Laplace Expansion)
-    float s0 = m(0,0) * m(1,1) - m(0,1) * m(1,0);
-    float s1 = m(0,0) * m(1,2) - m(0,2) * m(1,0);
-    float s2 = m(0,0) * m(1,3) - m(0,3) * m(1,0);
-    float s3 = m(0,1) * m(1,2) - m(0,2) * m(1,1);
-    float s4 = m(0,1) * m(1,3) - m(0,3) * m(1,1);
-    float s5 = m(0,2) * m(1,3) - m(0,3) * m(1,2);
-
-    float c5 = m(2,2) * m(3,3) - m(2,3) * m(3,2);
-    float c4 = m(2,1) * m(3,3) - m(2,3) * m(3,1);
-    float c3 = m(2,1) * m(3,2) - m(2,2) * m(3,1);
-    float c2 = m(2,0) * m(3,3) - m(2,3) * m(3,0);
-    float c1 = m(2,0) * m(3,2) - m(2,2) * m(3,0);
-    float c0 = m(2,0) * m(3,1) - m(2,1) * m(3,0);
-
-    float det = (s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0);
-    // This is a naive check. Singular matrices should be handled in a better way
-    if (std::abs(det) < 1e-9) throw std::runtime_error("Matrix is singular");
-
-    float invDet = 1.0f / det;
-
-    // Inverse matrix
-    Mat4f res(0.0f);
-    res(0,0) = ( m(1,1) * c5 - m(1,2) * c4 + m(1,3) * c3) * invDet;
-    res(0,1) = (-m(0,1) * c5 + m(0,2) * c4 - m(0,3) * c3) * invDet;
-    res(0,2) = ( m(3,1) * s5 - m(3,2) * s4 + m(3,3) * s3) * invDet;
-    res(0,3) = (-m(2,1) * s5 + m(2,2) * s4 - m(2,3) * s3) * invDet;
-
-    res(1,0) = (-m(1,0) * c5 + m(1,2) * c2 - m(1,3) * c1) * invDet;
-    res(1,1) = ( m(0,0) * c5 - m(0,2) * c2 + m(0,3) * c1) * invDet;
-    res(1,2) = (-m(3,0) * s5 + m(3,2) * s2 - m(3,3) * s1) * invDet;
-    res(1,3) = ( m(2,0) * s5 - m(2,2) * s2 + m(2,3) * s1) * invDet;
-
-    res(2,0) = ( m(1,0) * c4 - m(1,1) * c2 + m(1,3) * c0) * invDet;
-    res(2,1) = (-m(0,0) * c4 + m(0,1) * c2 - m(0,3) * c0) * invDet;
-    res(2,2) = ( m(3,0) * s4 - m(3,1) * s2 + m(3,3) * s0) * invDet;
-    res(2,3) = (-m(2,0) * s4 + m(2,1) * s2 - m(2,3) * s0) * invDet;
-
-    res(3,0) = (-m(1,0) * c3 + m(1,1) * c1 - m(1,2) * c0) * invDet;
-    res(3,1) = ( m(0,0) * c3 - m(0,1) * c1 + m(0,2) * c0) * invDet;
-    res(3,2) = (-m(3,0) * s3 + m(3,1) * s1 - m(3,2) * s0) * invDet;
-    res(3,3) = ( m(2,0) * s3 - m(2,1) * s1 + m(2,2) * s0) * invDet;
-
-    return res;
-}
 
 }
 }

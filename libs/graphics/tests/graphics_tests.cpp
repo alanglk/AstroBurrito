@@ -322,7 +322,7 @@ TEST(textureModel) {
     Light torch;
     torch.type = Light::POINT;
     torch.worldPos = Vec3f(5.0f, 2.0f, 5.0f); 
-    torch.color = Vec4f(1.0f, 0.7f, 0.3f, 1.0f); // Warm orange tint
+    torch.color = Vec4f(1.0f, 0.7f, 0.5, 1.0f); 
     torch.intensity = 12.0f; // Brightness
     torch.range = 10.0f;     // Visible up to 10 meters away
     
@@ -330,13 +330,14 @@ TEST(textureModel) {
     sun.type = Light::DIRECTIONAL;
     sun.worldDir = Vec3f(0.0f, -1.0f, -0.5f);
     sun.color = Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
-    sun.intensity = 2.5f;
+    sun.intensity = 1.5f;
     
     PhongShader shader;
     shader.projectionMatrix = camera.getProjectionMatrix();
     shader.modelMatrix = Mat4f::Identity();
     shader.material = std::make_shared<Material>(mat);
     shader.sceneLights.push_back(torch);
+    shader.sceneLights.push_back(sun);
 
     
     // Main loop
@@ -387,8 +388,7 @@ TEST(textureModel) {
 
 
 int main(){
-    return run_test("textureModel");
-
+    // return run_test("textureModel");
     bool allSuccess = run_all_tests();
     return !allSuccess;
 }
