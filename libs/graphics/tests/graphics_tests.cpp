@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 
+#include "astro/core/platform/LayerConfig.hpp"
 #include "astro/graphics/graphics.hpp"
 #include "astro/math/math.hpp"
 #include "astro_test.hpp"
@@ -62,7 +63,7 @@ public:
         };
         console->initialize(layerConfig);
     }
-    void showCanvas(const AstroCanvas& canvas){
+    void showCanvas(const Texture& canvas){
         console->render(canvas);
     }
 private:
@@ -76,14 +77,14 @@ TEST(clearCanvas){
     Matrix<Color, WIDTH, HEIGHT> wht_matrix(white);
 
     // Clear to black
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
     Matrix_View<Color, WIDTH, HEIGHT> canv_matrix(canvas.data.data()); // Init with random value
-    clearCanvas(canvas, black);
+    clearTexture(canvas, black);
     ASSERT_EQ(canv_matrix, black_matrix);
     
     
     // Clear to white
-    clearCanvas(canvas, white);
+    clearTexture(canvas, white);
     ASSERT_EQ(canv_matrix, wht_matrix);
 
     return true;
@@ -91,7 +92,7 @@ TEST(clearCanvas){
 
 TEST(lineDrawing){
     // Create canvas
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
     
     // Create test window
     TestWindow window("lineDrawing", WIDTH, HEIGHT);
@@ -107,7 +108,7 @@ TEST(lineDrawing){
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
     while(true){
-        clearCanvas(canvas,  gray);
+        clearTexture(canvas,  gray);
 
         // Update triangle
         int delta_y = 5*sin(0.05* i);
@@ -136,7 +137,7 @@ TEST(lineDrawing){
 
 TEST(wireframeDrawing){
     // Create canvas
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
     
     // Create test window
     TestWindow window("wireframeDrawing", WIDTH, HEIGHT);
@@ -161,7 +162,7 @@ TEST(wireframeDrawing){
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
     while(true){
-        clearCanvas(canvas, gray);
+        clearTexture(canvas, gray);
         
         // Render wireframe
         for (size_t i = 0; i < wf_obj.indices.size(); i += 3) {
@@ -175,9 +176,9 @@ TEST(wireframeDrawing){
             Vec2i v2_proj = project(v1);
             Vec2i v3_proj = project(v2);
             
-            if(!isInCanvasBounds(canvas, v1_proj.x, v1_proj.y )) continue;
-            if(!isInCanvasBounds(canvas, v2_proj.x, v2_proj.y )) continue;
-            if(!isInCanvasBounds(canvas, v3_proj.x, v3_proj.y )) continue;
+            if(!isInTextureBounds(canvas, v1_proj.x, v1_proj.y )) continue;
+            if(!isInTextureBounds(canvas, v2_proj.x, v2_proj.y )) continue;
+            if(!isInTextureBounds(canvas, v3_proj.x, v3_proj.y )) continue;
             
             draw2dLine(canvas, v1_proj.x, v1_proj.y, v2_proj.x, v2_proj.y, red);
             draw2dLine(canvas, v2_proj.x, v2_proj.y, v3_proj.x, v3_proj.y, green);
@@ -187,7 +188,7 @@ TEST(wireframeDrawing){
         // Render vertices
         for(const auto P : wf_obj.vertices){
             const Vec2i p = project(P.pos);
-            if(!isInCanvasBounds(canvas, p.x, p.y )) continue;
+            if(!isInTextureBounds(canvas, p.x, p.y )) continue;
             putPixel(canvas, p.x, p.y, white);
         }
 
@@ -212,7 +213,8 @@ TEST(wireframeDrawing){
 
 TEST(perspectiveCamera) {
     // Create canvas
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
+    ZBuffer zbuffer(WIDTH, HEIGHT);
     
     // Create test window
     TestWindow window("perspectiveCamera", WIDTH, HEIGHT);
@@ -240,7 +242,8 @@ TEST(perspectiveCamera) {
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
     while(true){
-        clearCanvas(canvas, gray);
+        clearTexture(canvas, gray);
+        clearZBuffer(zbuffer);
         float camX = orbitRadius*std::cos(orbitAlpha);
         float camZ = orbitRadius*std::sin(orbitAlpha);
         camera.lookAt({camX, 0., camZ}, {0., 0., 0.}, {0., 1., 0.});
@@ -260,7 +263,7 @@ TEST(perspectiveCamera) {
             Triangle triangle = {v0, v1, v2 };
             
             // Render triangle
-            TDRenderer::renderTriangle(canvas, triangle, shader);
+            TDRenderer::renderTriangle(canvas, zbuffer, triangle, shader);
         }
         
         // Show on window
@@ -276,7 +279,7 @@ TEST(perspectiveCamera) {
     }
     
     astro::core::io::PPMImage::writeImage("./graphics_camera_test.ppm", canvas);
-    AstroCanvas zBufferImage = canvas.zbuffer2Image();
+    Texture zBufferImage = zbuffer2Texture(zbuffer);
     astro::core::io::PPMImage::writeImage("./graphics_camera_depth_test.ppm", zBufferImage);
     return true;
 }
@@ -284,7 +287,8 @@ TEST(perspectiveCamera) {
 TEST(textureModel) {
 
     // Create window
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
+    ZBuffer zbuffer(WIDTH, HEIGHT);
     TestWindow window("textureModel", WIDTH, HEIGHT);
     
     // Load assets
@@ -310,10 +314,10 @@ TEST(textureModel) {
     mat.diffuseCoeff    = 1.0f;
     mat.specularCoeff   = 5.0f;
     mat.oppacity        = 1.0f;
-    mat.colorTexture    = std::make_shared<AstroCanvas>(diablo_diff);
-    mat.specularMap     = std::make_shared<AstroCanvas>(diablo_spec);
-    mat.normalMap       = std::make_shared<AstroCanvas>(diablo_nm_tangent);
-    mat.glowMap         = std::make_shared<AstroCanvas>(diablo_glow);
+    mat.colorTexture    = std::make_shared<Texture>(diablo_diff);
+    mat.specularMap     = std::make_shared<Texture>(diablo_spec);
+    mat.normalMap       = std::make_shared<Texture>(diablo_nm_tangent);
+    mat.glowMap         = std::make_shared<Texture>(diablo_glow);
     
     Light torch;
     torch.type = Light::POINT;
@@ -339,7 +343,8 @@ TEST(textureModel) {
     int i = 0;
     const auto init_t = std::chrono::steady_clock::now();
     while(true){
-        clearCanvas(canvas, gray);
+        clearTexture(canvas, gray);
+        clearZBuffer(zbuffer);
         float orbitX = orbitRadius*std::cos(orbitAlpha);
         float orbitY = orbitRadius*std::sin(orbitAlpha);
         orbitAlpha+=orbitDeltaAlpha;
@@ -361,7 +366,7 @@ TEST(textureModel) {
             Triangle triangle = {v0, v1, v2 };
             
             // Render triangle
-            TDRenderer::renderTriangle(canvas, triangle, shader);
+            TDRenderer::renderTriangle(canvas, zbuffer, triangle, shader);
         }
         
         // Show on window
@@ -377,8 +382,6 @@ TEST(textureModel) {
     }
     
     astro::core::io::PPMImage::writeImage("./graphics_camera_test.ppm", canvas);
-    AstroCanvas zBufferImage = canvas.zbuffer2Image();
-    astro::core::io::PPMImage::writeImage("./graphics_camera_depth_test.ppm", zBufferImage);
     return true;
 }
 

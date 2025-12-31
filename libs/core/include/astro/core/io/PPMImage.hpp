@@ -14,7 +14,7 @@ namespace io {
 
 class PPMImage {
 public:
-    static inline void writeImage(const std::string& path, const graphics::AstroCanvas& image){
+    static inline void writeImage(const std::string& path, const graphics::Texture& image){
         std::filesystem::path out_path = path;
         
         if (out_path.extension().compare(".ppm") != 0) {

@@ -35,9 +35,9 @@ int main(){
     console->initialize(layerConfig);
 
     
-    AstroCanvas canvas(WIDTH, HEIGHT);
+    Texture canvas(WIDTH, HEIGHT);
     Color clearColor(15, 15, 15);
-    clearCanvas(canvas, clearColor);
+    clearTexture(canvas, clearColor);
     
     LayerEvent event;
     bool shouldClose = false;
@@ -74,7 +74,7 @@ int main(){
         }
         
         // Clear
-        clearCanvas(canvas,  clearColor);
+        clearTexture(canvas,  clearColor);
         
         // Render
         console->render(canvas);

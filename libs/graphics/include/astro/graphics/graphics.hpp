@@ -12,7 +12,9 @@ namespace graphics {
 
 using namespace astro::math;
 
-// Color structure
+
+
+// --- Color ----------------------------------------
 struct Color : public Vector<uint8_t, 4> {
     
     // Inherit all of the base class's constructors
@@ -27,117 +29,170 @@ struct Color : public Vector<uint8_t, 4> {
 };
 
 
-// Canvas structure
-#define ASTRO_INDEX(x, y, width) 
-struct AstroCanvas {
+
+// --- Texture --------------------------------------
+struct Texture {
     int width;
     int height;
     std::vector<Color> data;
-    std::vector<double> zbuffer;
-    static constexpr double NEAR_VAL = 0.0;
-    static constexpr double FAR_VAL = 1.0;
-    
-    AstroCanvas(int width, int height): width(width), height(height){
+    Texture(int width, int height): width(width), height(height){
         data.resize(width*height, Color(0,0,0,255));
-        zbuffer.resize(data.size(), FAR_VAL);
     }
-    
     int index(int x, int y) const { return y*width+x; }
-    
-    AstroCanvas zbuffer2Image() {
-        AstroCanvas res(width, height);
-        res.zbuffer = zbuffer;
-        for(int i = 0; i < res.zbuffer.size(); i++) {
-            double depth = zbuffer[i];
-            if (depth < 0.0) depth = 0.0;
-            if (depth > 1.0) depth = 1.0;
-            uint8_t d_val = static_cast<uint8_t>((1.0 - depth) * 255.0);
-            res.data[i] = {d_val, d_val, d_val, 255};
-        }
-        return res;
-    }
 };
 
-
 /**
- * @brief Clears the canvas with color 'color'
- * 
- * @param canvas 
+ * @brief Clears the texture with color 'color'
+ * @param texture 
  * @param color 
  */
-void clearCanvas(AstroCanvas& canvas, Color &color);
+void clearTexture(Texture& texture, Color &color);
 
 /**
- * @brief Checks wheter the point is in the canvas or not
- * @param canvas 
+ * @brief Checks wheter the point is in the texture or not
+ * @param texture 
  * @param point 
  * @return true 
  * @return false 
  */
-bool isInCanvasBounds(AstroCanvas& canvas, int x, int y);
+bool isInTextureBounds(Texture& texture, int x, int y);
 
 /**
- * @brief Sets a pixel color on the canvas
- * @param canvas 
+ * @brief Sets a pixel color on the texture
+ * @param texture 
  * @param x 
  * @param y 
  * @param color 
  */
-void putPixel(AstroCanvas& canvas, int x, int y, Color &color);
+void putPixel(Texture& texture, int x, int y, Color &color);
 
 /**
- * @brief Sets a pixel depth value in range [0, 1]
+ * @brief Get the Pixel color of the texture
  * 
- * @param canvas 
- * @param x 
- * @param y 
- * @param depth 
- */
-void putDepth(AstroCanvas& canvas, int x, int y, double depth);
-
-/**
- * @brief Get the Pixel color of the AstroCanvas
- * 
- * @param canvas 
+ * @param texture 
  * @param x 
  * @param y 
  * @return const Color& 
  */
-const Color& getPixel(const AstroCanvas& canvas, int x, int y);
+const Color& getPixel(const Texture& texture, int x, int y);
 
 /**
- * @brief Get the Depth value of the AstroCanvas
- * 
- * @param canvas 
+ * @brief Get the Pixel color of a texture at a UV coord
+ * @param texture 
+ * @param x 
+ * @param y 
+ * @return const Color& 
+ */
+Color sampleTextureColor(const Texture& texture, Vec2f uv);
+
+/**
+ * @brief Sample a texture value at UV coord and convert it to a Vector format ([0, 1] range)
+ * @param texture 
+ * @param x 
+ * @param y 
+ * @return Vec4f 
+ */
+Vec4f sampleTexureColorAsVec4f(const Texture& texture, Vec2f uv);
+
+/**
+ * @brief Sample a texture value at UV coord and convert it to a Vector format ([0, 1] range)
+ * @param texture 
+ * @param x 
+ * @param y 
+ * @return Vec3f 
+ */
+Vec3f sampleTexureColorAsVec3f(const Texture& texture, Vec2f uv);
+
+/**
+ * @brief Sample a texture value into a Vector ([-1, 1] range) at a UV coord
+ * @param texture 
+ * @param x 
+ * @param y 
+ * @return Vec3f 
+ */
+Vec4f sampleTexureVectorAsVec4f(const Texture& texture, Vec2f uv);
+
+/**
+ * @brief Sample a texture value into a Vector ([-1, 1] range) at a UV coord
+ * @param texture 
+ * @param uv 
+ * @return Vec3f 
+ */
+Vec3f sampleTexureVectorAsVec3f(const Texture& texture, Vec2f uv);
+
+
+
+// --- Z-Buffering ----------------------------------
+struct ZBuffer {
+    static constexpr double NEAR_VAL = 0.0;
+    static constexpr double FAR_VAL = 1.0;
+    std::vector<double> data;
+    int width, height;
+    ZBuffer(int width, int height): width(width), height(height) {
+        data.resize(width*height, FAR_VAL);
+    }
+    int index(int x, int y) const { return y*width+x; }
+};
+
+/**
+ * @brief Clears the zbuffer 
+ * @param zbuffer 
+ * @param color 
+ */
+void clearZBuffer(ZBuffer& zbuffer);
+
+/**
+ * @brief Get the Depth value of the ZBuffer
+ * @param zbuffer 
  * @param x 
  * @param y 
  * @return const double&
 */
-const double& getDepth(const AstroCanvas& canvas, int x, int y);
+const double& getDepth(const ZBuffer& zbuffer, int x, int y);
 
 /**
+ * @brief Sets a pixel depth value in range [0, 1]
+ * @param zbuffer 
+ * @param x 
+ * @param y 
+ * @param depth 
+ */
+void putDepth(ZBuffer& canvas, int x, int y, double depth);
+
+/**
+ * @brief Create a texture from a depth buffer
+ * @param zbuffer 
+ * @param color color to gradient the depth (default white)
+ * @return Texture 
+ */
+Texture zbuffer2Texture(const ZBuffer& zbuffer, Color col = Color(255, 255, 255));
+
+
+
+// --- 2D Rendering ---------------------------------
+/**
  * @brief Draw a 2D line from A (x1, y1) to B (x2, y2) with color 'color'.
- * @param canvas 
+ * @param texture 
  * @param x1 
  * @param y1 
  * @param x2 
  * @param y2 
  * @param color 
  */
-void draw2dLine(AstroCanvas& canvas, int x1, int y1, int x2, int y2, Color &color);
+void draw2dLine(Texture& texture, int x1, int y1, int x2, int y2, Color &color);
 
 /**
  * @brief Draw a 2D line from A (x1, y1) to B (x2, y2) with color 'color'.
- * @param canvas 
+ * @param texture 
  * @param a (x1, y1)
  * @param b (x2, y2)
  * @param color 
  */
-void draw2dLine(AstroCanvas& canvas, Vec2i a, Vec2i b, Color &color);
+void draw2dLine(Texture& texture, Vec2i a, Vec2i b, Color &color);
 
 /**
-* @brief Draw a 2D triangle with color 'color' in the canvas. 
- * @param canvas 
+* @brief Draw a 2D triangle with color 'color' in the texture. 
+ * @param texture 
  * @param x1 
  * @param y1 
  * @param x2 
@@ -146,21 +201,21 @@ void draw2dLine(AstroCanvas& canvas, Vec2i a, Vec2i b, Color &color);
  * @param y3 
  * @param color 
  */
-void draw2dTriangle(AstroCanvas& canvas, int x1, int y1, int x2, int y2, int x3, int y3, Color color);
+void draw2dTriangle(Texture& texture, int x1, int y1, int x2, int y2, int x3, int y3, Color color);
 
 /**
- * @brief Draw a 2D triangle with color 'color' in the canvas
- * 
- * @param canvas 
+ * @brief Draw a 2D triangle with color 'color' in the texture
+ * @param texture 
  * @param a (x1, y1)
  * @param b (x2, y2)
  * @param c (x3, y3)
  * @param color 
  */
-void draw2dTriangle(AstroCanvas& canvas, Vec2i a, Vec2i b, Vec2i c, Color color);
+void draw2dTriangle(Texture& texture, Vec2i a, Vec2i b, Vec2i c, Color color);
 
 
-// 3D Rendering
+
+// --- 3D Rendering ---------------------------------
 struct VertexAttributes {
     Vec2f uv;
     Vec4f pos;
@@ -169,6 +224,7 @@ struct VertexAttributes {
     // Add more attributes as needed
 };
 typedef VertexAttributes Triangle[3];
+
 struct Varyings {
     Vec2f uv;
     Vec4f pos; // Screen space position
@@ -177,6 +233,33 @@ struct Varyings {
     Vec3f tangent;
     // Add more attributes as needed
 };
+
+// Lighting
+struct Light {
+    enum{ DIRECTIONAL, POINT } type;
+    Vec4f color;
+    Vec3f worldPos; // Used for point lights
+    Vec3f worldDir; // Used for directional lights
+    float intensity;
+    float range;    // Attenuation for point lights
+};
+
+// Materials
+struct Material {
+    float shininess;        // Higher -> sharper lighting
+    float diffuseCoeff;
+    float specularCoeff;
+    float oppacity = 1.0f;
+    Vec4f color;            // Material base color
+
+    // Textures
+    std::shared_ptr<Texture> colorTexture   = nullptr;
+    std::shared_ptr<Texture> specularMap    = nullptr;
+    std::shared_ptr<Texture> normalMap      = nullptr;
+    std::shared_ptr<Texture> glowMap        = nullptr;
+};
+
+// Shaders
 struct IShader {
     using Ptr = std::shared_ptr<IShader>; 
     /**
@@ -202,86 +285,15 @@ struct BasicShader : public IShader {
     Mat4f viewMatrix = Mat4f::Identity();
     Mat4f projectionMatrix = Mat4f::Identity();
 
-    void updateMVP() {
-        MV = viewMatrix * modelMatrix;
-        MVP = projectionMatrix * MV;
-        MV_invT = transpose(inverse(MV));
-    }
-    virtual bool vertex(const VertexAttributes& in_vert, Varyings& out_varying) const override {
-        out_varying.pos = MVP * in_vert.pos;
-        out_varying.worldPos = MV * in_vert.pos;
-        out_varying.normal = (MV_invT * Vec4f(in_vert.normal, 0.0)).xyz;
-        out_varying.tangent = (MV_invT * Vec4f(in_vert.tangent, 0.0)).xyz;
-        out_varying.uv = in_vert.uv;
-        return true;
-    }
-
-    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override {
-        out_color = Color(255, 255, 255, 255);
-        return true;
-    }
+    void updateMVP();
+    virtual bool vertex(const VertexAttributes& in_vert, Varyings& out_varying) const override;
+    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override;
 
 protected:
     Mat4f MV = Mat4f::Identity();
     Mat4f MVP = Mat4f::Identity();
     Mat4f MV_invT = Mat4f::Identity();
 };
-
-struct Light {
-    enum{ DIRECTIONAL, POINT } type;
-    Vec4f color;
-    Vec3f worldPos; // Used for point lights
-    Vec3f worldDir; // Used for directional lights
-    float intensity;
-    float range;    // Attenuation for point lights
-};
-
-struct Material {
-    float shininess;        // Higher -> sharper lighting
-    float diffuseCoeff;
-    float specularCoeff;
-    float oppacity = 1.0f;
-    Vec4f color;            // Material base color
-
-    // Textures
-    std::shared_ptr<AstroCanvas> colorTexture   = nullptr;
-    std::shared_ptr<AstroCanvas> specularMap    = nullptr;
-    std::shared_ptr<AstroCanvas> normalMap      = nullptr;
-    std::shared_ptr<AstroCanvas> glowMap        = nullptr;
-};
-
-inline Color sampleTextureColor(const AstroCanvas& texture, Vec2f uv) {
-    // Wrap UVs to 0.0 - 1.0
-    float u = uv.x - std::floor(uv.x);
-    float v = uv.y - std::floor(uv.y);
-    
-    // Flip V (Texture coordinates usually start top-left, UVs bottom-left)
-    v = 1.0f - v; 
-
-    // Map to pixel dimensions
-    int tx = static_cast<int>(u * texture.width);
-    int ty = static_cast<int>(v * texture.height);
-
-    // Clamp safety
-    tx = std::max(0, std::min(tx, texture.width - 1));
-    ty = std::max(0, std::min(ty, texture.height - 1));
-
-    return getPixel(texture, tx, ty);
-}
-inline Vec4f sampleTexureColorAsVec4f(const AstroCanvas& texture, Vec2f uv) {
-    Color col = sampleTextureColor(texture, uv);
-    return Vec4f(col.r, col.g, col.b, col.a) / 255.0f;
-}
-inline Vec3f sampleTexureColorAsVec3f(const AstroCanvas& texture, Vec2f uv) {
-    return sampleTexureColorAsVec4f(texture, uv).xyz;
-}
-inline Vec4f sampleTexureVectorAsVec4f(const AstroCanvas& texture, Vec2f uv) {
-    Vec4f col = sampleTexureColorAsVec4f(texture, uv);
-    return (col /255.0f) * 2.0f - Vec4f(1.0f);
-}
-inline Vec3f sampleTexureVectorAsVec3f(const AstroCanvas& texture, Vec2f uv) {
-    return sampleTexureColorAsVec4f(texture, uv).xyz;
-}
 
 struct PhongShader : public BasicShader {
     std::vector<Light> sceneLights;
@@ -296,92 +308,17 @@ struct PhongShader : public BasicShader {
      * @param cameraPos 
      * @return Vec4f 
      */
-    Vec4f calculatePhong(const Light& light, const Vec3f& normal, const Vec3f& worldPos, const Vec3f& cameraPos, const Vec4f& specMask) const {
-        Vec3f L; // Light Direction
-        float attenuation = 1.0f; // Light Strength
-
-        // Point light
-        if( light.type == Light::POINT) {
-            L = light.worldPos - worldPos;
-            float dist = len(L); 
-            if(dist > light.range) return Vec4f(0.0f); // No light
-
-            attenuation = light.intensity / (1.0f + dist*dist); // to prevent divission by 0
-            L = normalize(L);
-        }
-
-        // Directional light
-        else {
-            L = normalize(light.worldDir * -1.0f);
-            attenuation = light.intensity;
-        }
-        
-        // Diffuse (lambertian)
-        float nDotL = dot(normal, L);
-        float diff = std::max(0.0f,nDotL); // Lambertian reflection (N dot L)
-        Vec4f diffusePart = light.color * diff * material->diffuseCoeff;
-
-        // Specular (phong)
-        Vec4f specularPart(0.0f);
-        if(nDotL > 0.0f) {
-            Vec3f V = normalize(cameraPos - worldPos);
-            Vec3f R = normalize((normal * (2.0f * dot(normal, L))) - L); // Reflect -L around normal
-            float spec = std::pow(std::max(dot(V, R), 0.0f), material->shininess);
-            specularPart = light.color * (spec * material->specularCoeff) * specMask;
-        }
-        return (diffusePart + specularPart) * attenuation;
-    };
-    
-    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override {
-        Vec3f N = normalize(interpolated.normal);
-    
-
-        // Normal Mapping
-        Vec3f finalNormal = N; 
-        if (material->normalMap) {
-            Vec3f T = normalize(interpolated.tangent);
-            // T = normalize(T - N * dot(T, N)); // Gram-Schmidt
-            Vec3f B = cross(N, T); // Bitangent
-            Vec3f mappedNormal = sampleTexureVectorAsVec3f(*material->normalMap, interpolated.uv);
-
-            // Transform normal from Tangent Space to World Space
-            // Matrix3x3(T, B, N) * mappedNormal
-            finalNormal = normalize(T * mappedNormal.x + B * mappedNormal.y + N * mappedNormal.z);
-        }
-
-        // Texture Color
-        Vec4f texColor = (material->colorTexture) ? sampleTexureColorAsVec4f(*material->colorTexture, interpolated.uv) : material->color;
-        
-        // Specular Mask
-        Vec4f specMask = (material->specularMap) ? sampleTexureColorAsVec4f(*material->specularMap, interpolated.uv) : Vec4f(1.0f);
-
-        // Emmisive Materials (fake glowing)
-        Vec4f emissive = (material->glowMap) ? sampleTexureColorAsVec4f(*material->glowMap, interpolated.uv) : Vec4f(0.0f);
-
-        // Compute accumulated light
-        Vec4f accumulatedLight(0.0f);
-        for(const Light& light : sceneLights) {
-            accumulatedLight = accumulatedLight + calculatePhong(light, finalNormal, interpolated.worldPos.xyz, cameraPos, specMask);
-        }
-        
-        // Combine and create final fragment color
-        Vec4f combined = (texColor * accumulatedLight) + emissive;
-        out_color = Color(
-            static_cast<uint8_t>(std::clamp(combined.x * 255.0f, 0.0f, 255.0f)),
-            static_cast<uint8_t>(std::clamp(combined.y * 255.0f, 0.0f, 255.0f)),
-            static_cast<uint8_t>(std::clamp(combined.z * 255.0f, 0.0f, 255.0f)),
-            static_cast<uint8_t>(std::clamp(combined.w * material->oppacity * 255.0f, 0.0f, 255.0f))
-        );
-        return true;
-    }
+    Vec4f calculatePhong(const Light& light, const Vec3f& normal, const Vec3f& worldPos, const Vec3f& cameraPos, const Vec4f& specMask) const;
+    virtual bool fragment(const Varyings& interpolated, Color& out_color) const override;
 
 };
 
+// Renderer
 /**
  * @brief 3D Renderer Pipeline
  */
 struct TDRenderer {
-    static void renderTriangle(AstroCanvas& canvas, const Triangle& triangle, const IShader& shader);
+    static void renderTriangle(Texture& texture, ZBuffer& zbuffer, const Triangle& triangle, const IShader& shader);
 };
 
 }

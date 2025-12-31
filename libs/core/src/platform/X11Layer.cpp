@@ -221,7 +221,7 @@ namespace platform {
         key_data.keycode = xkey_event->keycode;
     }
 
-    void X11Layer::render(const graphics::AstroCanvas& canvas) {
+    void X11Layer::render(const graphics::Texture& canvas) {
         // Destination buffer
         unsigned char* dst_data = reinterpret_cast<unsigned char*>(ximage->data);
 

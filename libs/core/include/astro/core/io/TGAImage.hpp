@@ -19,7 +19,7 @@ public:
     static constexpr int TGA_TYPE_UNCOMPRESSED_RGB = 2;
     static constexpr int TGA_TYPE_RLE_RGB = 10; // New support
 
-    static inline graphics::AstroCanvas readImage(const std::string& path) {
+    static inline graphics::Texture readImage(const std::string& path) {
         std::filesystem::path in_path(path);
         
         if (!std::filesystem::exists(in_path)) {
@@ -124,7 +124,7 @@ public:
         fs.close();
 
         // --- 4. Orientation & Mapping ---
-        graphics::AstroCanvas image(width, height);
+        graphics::Texture image(width, height);
         bool isTopLeft = (descriptor & 0x20); 
 
         for (int y = 0; y < height; ++y) {
@@ -150,7 +150,7 @@ public:
     }
 
     // writeImage remains the same as the optimized version previously provided
-    static inline void writeImage(const std::string& path, const graphics::AstroCanvas& image) {
+    static inline void writeImage(const std::string& path, const graphics::Texture& image) {
         std::ofstream fs(path, std::ios::binary);
         if (!fs.is_open()) throw std::runtime_error("Cannot create: " + path);
 
